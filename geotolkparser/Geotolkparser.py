@@ -1,4 +1,4 @@
-import geotolkparser.load
+import geotolkparser.load as load
 from geotolkparser.snd import process_snd
 from geotolkparser.prv import process_prv
 from geotolkparser.tlk import process_tlk
