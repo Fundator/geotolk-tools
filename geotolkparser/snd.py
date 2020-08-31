@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime
 import logging
 
-import helpers
+import geotolkparser.helpers
 
 logger = logging.getLogger(__name__)
 VERBOSE = True
