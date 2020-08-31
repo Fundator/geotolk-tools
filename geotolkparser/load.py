@@ -7,10 +7,10 @@ import logging
 import pandas as pd
 
 #from src.config import NADAG_DIR, GEOARKIV_TXT, NORCONSULT_DIR_LOCAL, GEOVEST_DIR_LOCAL
-from snd import process_snd
-from prv import process_prv
-from tlk import process_tlk
-from helpers import merge_dfs
+from geotolkparser.snd import process_snd
+from geotolkparser.prv import process_prv
+from geotolkparser.tlk import process_tlk
+from geotolkparser.helpers import merge_dfs
 
 logger = logging.getLogger(__name__)
 
