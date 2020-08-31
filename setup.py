@@ -2,13 +2,13 @@ from distutils.core import setup
 setup(
   name = 'geotolkparser',         # How you named your package folder (MyLib)
   packages = ['geotolkparser'],   # Chose the same as "name"
-  version = '0.1',      # Start with a small number and increase it with every change you make
+  version = '0.3',      # Start with a small number and increase it with every change you make
   license='MIT',        # Chose a license from here: https://help.github.com/articles/licensing-a-repository
   description = 'Parser for total sounding and related files',   # Give a short description about your library
   author = 'Einar Wigum Arbo',                   # Type in your name
   author_email = 'einararbo@gmail.com',      # Type in your E-Mail
   url = "https://github.com/einarwar/geotolkparser",   # Provide either the link to your github or to your website
-  download_url = "https://github.com/Fundator/geotolkparser/archive/v_01.tar.gz",    # I explain this later on
+  download_url = 'https://github.com/Fundator/geotolkparser/archive/v_03.tar.gz',    # I explain this later on
   keywords = ['Geotechincs', 'Parsing'],   # Keywords that define your package best
   install_requires=[            # I get to this in a second
           'numpy',
