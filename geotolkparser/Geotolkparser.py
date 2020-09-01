@@ -1,8 +1,8 @@
-from geotolkparser.load import process_file, get_id, find_files_in_autograf_dbf, make_dataframes
-from geotolkparser.snd import process_snd
-from geotolkparser.prv import process_prv
-from geotolkparser.tlk import process_tlk
-from geotolkparser.helpers import merge_dfs
+from .load import process_file, get_id, find_files_in_autograf_dbf, make_dataframes
+from .snd import process_snd
+from .prv import process_prv
+from .tlk import process_tlk
+from .helpers import merge_dfs
 import logging
 import os
 

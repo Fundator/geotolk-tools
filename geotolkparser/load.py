@@ -2,17 +2,13 @@
 Functions for loading data from Geosuite archives (AUTOGRAF.DBF folders)
 """
 import os
-# from tqdm.auto import tqdm
 import logging
 import pandas as pd
 
-#from src.config import NADAG_DIR, GEOARKIV_TXT, NORCONSULT_DIR_LOCAL, GEOVEST_DIR_LOCAL
-from geotolkparser.snd import process_snd
-from geotolkparser.prv import process_prv
-from geotolkparser.tlk import process_tlk
-from geotolkparser.helpers import merge_dfs
-
-logger = logging.getLogger(__name__)
+from .snd import process_snd
+from .prv import process_prv
+from .tlk import process_tlk
+from .helpers import merge_dfs
 
 
 def filename_is_valid(path, f):
@@ -126,19 +122,19 @@ def process_file(path, filename):
         try:
             file_dict = process_snd(lines)
         except Exception as e:
-            logger.warning(f"Could not process file {filename}: {e}")
+            logging.warning(f"Could not process file {filename}: {e}")
             file_dict = None
     elif filetype == "prv":
         try:
             file_dict = process_prv(lines)
         except Exception as e:
-            logger.warning(f"Could not process file {filename}: {e}")
+            logging.warning(f"Could not process file {filename}: {e}")
             file_dict = None
     elif filetype == "tlk":
         try:
             file_dict = process_tlk(lines)
         except Exception as e:
-            logger.warning(f"Could not process file {filename}: {e}")
+            logging.warning(f"Could not process file {filename}: {e}")
             file_dict = None
     else:
         raise ValueError("Invalid file type: {}".format(filetype))
@@ -146,146 +142,6 @@ def process_file(path, filename):
     if file_dict is not None:
         file_dict["filename"] = filename
     return file_dict
-
-def process_single_file(lines: list, filename: str) -> dict:
-    filetype = filename[-3:].lower()
-
-    if filetype == "snd":
-        try:
-            file_dict = process_snd(lines)
-        except Exception as e:
-            logger.warning(f"Could not process file {filename}: {e}")
-            file_dict = None
-    elif filetype == "prv":
-        try:
-            file_dict = process_prv(lines)
-        except Exception as e:
-            logger.warning(f"Could not process file {filename}: {e}")
-            file_dict = None
-    elif filetype == "tlk":
-        try:
-            file_dict = process_tlk(lines)
-        except Exception as e:
-            logger.warning(f"Could not process file {filename}: {e}")
-            file_dict = None
-    else:
-        raise ValueError("Invalid file type: {}".format(filetype))
-
-    if file_dict is not None:
-        file_dict["filename"] = filename
-    return file_dict
-
-def find_autograf_dbfs(nadag=True, norconsult="local", geovest=True):
-    """
-    Find all AUTOGRAF.DBF folders for the specified datasets
-    :param nadag: Find folders in the NADAG dataset?
-    :type nadag: bool
-    :param norconsult: Find folders in the Norconsult dataset? Can be either "local" (Find folders in the local data-
-                       directory), or "network" (loads data directly from the project folders on the X-drive, using
-                       paths from 'config.SHAREPOINT_DATA_DIR/nc_geoarkiv.txt'). If norconsult=False, no Norconsult data
-                       is loaded.
-    :type norconsult: str or bool
-    :param geovest: Find folders in the Geovest dataset?
-    :type geovest: bool
-    :return: List of paths to AUTOGRAF.DBF folders.
-    :rtype: list of str
-    """
-    paths = []
-
-    if nadag:
-        for dirname in os.listdir(NADAG_DIR):
-            path = os.path.join(NADAG_DIR, dirname, "AUTOGRAF.DBF")
-            if os.path.isdir(path):
-                paths.append((path, "nadag", dirname))
-
-    if norconsult == "network":
-        with open(GEOARKIV_TXT, "r") as index_file:
-            for line in index_file:
-                path = os.path.join(line.replace("\n", ""), "AUTOGRAF.DBF")
-                if os.path.isdir(path):
-                    split_path = path.split("\\")
-                    location = split_path[3]
-                    project = split_path[6]
-                    paths.append((path, location, project))
-    elif norconsult == "local":
-        for dirname in os.listdir(NORCONSULT_DIR_LOCAL):
-            path = os.path.join(NORCONSULT_DIR_LOCAL, dirname, "AUTOGRAF.DBF")
-            if os.path.isdir(path):
-                location, project = path.split("\\")[-2].split("_")
-                paths.append((path, location, project))
-
-    if geovest:
-        for dirname in os.listdir(GEOVEST_DIR_LOCAL):
-            path = os.path.join(GEOVEST_DIR_LOCAL, dirname, "AUTOGRAF.DBF")
-            if os.path.isdir(path):
-                project = path.split("\\")[-2]
-                paths.append((path, "Geovest", project))
-
-    return paths
-
-
-def load(nadag=True, norconsult="local", geovest=True, max_autograf_dbf=None):
-    """
-    Load data from the specified datasets.
-
-    :param nadag: Find folders in the NADAG dataset?
-    :type nadag: bool
-    :param norconsult: Find folders in the Norconsult dataset? Can be either "local" (Find folders in the local data-
-                       directory), or "network" (loads data directly from the project folders on the X-drive, using
-                       paths from 'config.SHAREPOINT_DATA_DIR/nc_geoarkiv.txt'). If norconsult=False, no Norconsult data
-                       is loaded.
-    :type norconsult: str or bool
-    :param geovest: Find folders in the Geovest dataset?
-    :type geovest: bool
-    :param max_autograf_dbf: Modifier for the list of valid AUTOGRAF.DBF folders. If int, the first 'max_autograf_dbf'
-                             will be loaded. If 'max_autograf_dbf' callable, it will be called with the list of valid
-                             paths as its only argument. It is expected to return a list or tuple with the same format
-                             as the input.
-    :type max_autograf_dbf: int | callable
-    :return: Dictionary with processed files. Keys are Bore-hole IDs and values are lists of dicts from processed files,
-             e.g.:
-             'nadag/130696-04 Vannforsyning Huseby utfo (62527)/02': [
-                 {
-                     'type': 'snd',
-                     'xyz': (6649984.147438, 256829.340154, 16.612),
-                     'guid': '4ddf32af-d5ab-4aef-a50e-aa6e80330f80',
-                     'blocks': [{
-                             'type': 'tot',
-                             'date': datetime.datetime(2019, 3, 11, 0, 0),
-                             'guid': '345a6d8f-b200-4152-8f70-0027966f6929',
-                             'data': <pd.DataFrame>
-                         }],
-                     'filename': '02.SND'
-                 },{
-                     'type': 'tlk',
-                     'xyz': [nan, nan, nan],
-                     'guid': UUID('5f2f15ff-d70e-4583-8ebf-bc56bcf32bfb'),
-                     'data': <pd.DataFrame>,
-                     'filename': '02.TLK'
-                 }
-             ]
-    :rtype: dict
-    """
-    autograf_paths = find_autograf_dbfs(nadag=nadag, norconsult=norconsult, geovest=geovest)
-
-    if max_autograf_dbf is not None:
-        if callable(max_autograf_dbf):
-            autograf_paths = max_autograf_dbf(autograf_paths)
-            assert isinstance(autograf_paths, (list, tuple)), "Expected list or tuple from callable 'max_autograf_dbf'."
-        elif isinstance(max_autograf_dbf, int):
-            autograf_paths = autograf_paths[:max_autograf_dbf]
-        else:
-            raise ValueError("Got invalid 'max_autograf_dbf'")
-
-    out = {}
-    # for path, location, project in tqdm(autograf_paths):
-    for path, location, project in autograf_paths:
-
-        files_dict = process_autograf_dbf(path, location, project)
-        if files_dict is not None:
-            out.update(files_dict)
-
-    return out
 
 
 def make_dataframes(files_dict):
@@ -299,7 +155,6 @@ def make_dataframes(files_dict):
     """
     tot, cpt, prv, tlk = [], [], [], []
 
-    # for file_id, file_list in tqdm(files_dict.items()):
     for file_id, file_list in files_dict.items():
 
         for file_dict in file_list:
