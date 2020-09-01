@@ -7,7 +7,7 @@ import pandas as pd
 from datetime import datetime
 import logging
 
-import geotolkparser.helpers
+from geotolkparser.helpers import find_blocks, get_xyz, match_pattern_in_block, DATE_PATTERN, GUID_PATTERN
 
 logger = logging.getLogger(__name__)
 VERBOSE = True
@@ -27,15 +27,15 @@ def process_snd(lines):
     :return: Dict containing data from lines
     :rtype: dict
     """
-    blocks = helpers.find_blocks(lines)
+    blocks = find_blocks(lines)
     if len(blocks) < 4:
         raise RuntimeError("Did not find the expected amount of blocks")
         return None
 
     file_dict = {
         "type": "snd",
-        "xyz": helpers.get_xyz(blocks[0]),
-        "guid": helpers.match_pattern_in_block(helpers.GUID_PATTERN, blocks[2]),
+        "xyz": get_xyz(blocks[0]),
+        "guid": match_pattern_in_block(GUID_PATTERN, blocks[2]),
         "blocks": []
     }
     data_blocks = blocks[3:]
@@ -243,7 +243,7 @@ def get_date_and_guid(metadata):
     :return: date and guid
     :rtype: datetime.datetime, str
     """
-    date = helpers.match_pattern_in_block(helpers.DATE_PATTERN, metadata)
+    date = match_pattern_in_block(DATE_PATTERN, metadata)
     if date is not None:
         day, month, year = date
         try:
@@ -251,5 +251,5 @@ def get_date_and_guid(metadata):
         except ValueError as e:
             logger.error(e)
             date = np.nan
-    guid = helpers.match_pattern_in_block(helpers.GUID_PATTERN, metadata)
+    guid = match_pattern_in_block(GUID_PATTERN, metadata)
     return date, guid

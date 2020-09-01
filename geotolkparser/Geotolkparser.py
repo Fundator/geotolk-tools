@@ -1,4 +1,4 @@
-import geotolkparser.load as load
+from geotolkparser.load import process_file, get_id, find_files_in_autograf_dbf, make_dataframes
 from geotolkparser.snd import process_snd
 from geotolkparser.prv import process_prv
 from geotolkparser.tlk import process_tlk
@@ -6,35 +6,36 @@ from geotolkparser.helpers import merge_dfs
 import logging
 import os
 
+import pandas as pd
 logger = logging.getLogger(__name__)
 
 def process_multiple_by_path(path: str, location: str, project: str) -> dict:
-    filenames = load.find_files_in_autograf_dbf(path)
+    filenames = find_files_in_autograf_dbf(path)
     processed_files = {}
     
     for filename in filenames:
-        proc = load.process_file(path, filename)
+        proc = process_file(path, filename)
         if proc is not None:
-            _id = load.get_id(location, project, filename)
+            _id = get_id(location, project, filename)
             file_list = processed_files.get(_id, [])
             processed_files[_id] = file_list + [proc]
 
     return processed_files
 
-def process_multiple_by_lines(list_of_lines, location, project):
+def process_multiple_by_lines(list_of_lines: list, location: str, project: str) -> dict:
     processed_files = {}
     for file in list_of_lines:
         data = file["data"]
         filename = file["name"]
         proc = process_file_by_lines(data, filename)
         if proc is not None:
-            _id = load.get_id(location, project, filename)
+            _id = get_id(location, project, filename)
             file_list = processed_files.get(_id, [])
             processed_files[_id] = file_list + [proc]
 
     return processed_files
 
-def process_file_by_path(path):
+def process_file_by_path(path: str) -> dict:
     """
     Process 'filename' located at 'path' Must be either a .snd/SND, .PRV, or .TLK file.
 
@@ -107,10 +108,22 @@ def process_file_by_lines(lines: list, filename: str) -> dict:
 
 # Convenience functions to convert paths to lines (lines in a txt file)
 
-def convert_multiple_to_lines(path):
-    files = load.find_files_in_autograf_dbf(path)
+def convert_multiple_to_lines(path: str) -> list:
+    files = find_files_in_autograf_dbf(path)
     return [{"data": convert_file_to_lines(os.path.join(path, f)), "name": f} for f in files]
  
-def convert_file_to_lines(path):
+def convert_file_to_lines(path: str) -> list:
     with open(path, "r") as f:
         return f.readlines()
+
+
+# Function to convert dictionary to dataframes
+
+def dict_to_dataframes(file_dict: dict) -> pd.DataFrame:
+    if "type" in file_dict.keys():
+        if file_dict["type"] == "snd":
+            return file_dict["blocks"][0]["data"]
+        elif file_dict["type"] == "tlk":
+            return file_dict["data"]
+    else:
+        return make_dataframes(file_dict)
