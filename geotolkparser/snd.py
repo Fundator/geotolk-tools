@@ -5,11 +5,9 @@ import re
 import numpy as np
 import pandas as pd
 from datetime import datetime
-import logging
 
-from geotolkparser.helpers import find_blocks, get_xyz, match_pattern_in_block, DATE_PATTERN, GUID_PATTERN
+from .helpers import find_blocks, get_xyz, match_pattern_in_block, DATE_PATTERN, GUID_PATTERN
 
-logger = logging.getLogger(__name__)
 VERBOSE = True
 MIN_DATA_LENGTH = 10
 TOT_ROW_PATTERN = re.compile(r" +(\d+\.\d*) +(-?\d+) +(-?\d+) +(\d+) *(.*) *")
@@ -102,8 +100,6 @@ def process_cpt(block):
         if matches:
             if len(matches[0]) >= 9:
                 rows.append(get_values_from_data_row_cpt(matches[0]))
-            else:
-                logger.error("Less than  9 values found")
     if not rows:
         return None
     return pd.DataFrame(rows)
@@ -143,8 +139,6 @@ def process_tot(block):
         if matches:
             if len(matches[0]) >= 4:
                 rows.append(get_values_from_data_row_tot(matches[0]))
-            else:
-                logger.error("Less than 4 values found")
     if not rows:
         return None
 
@@ -249,7 +243,6 @@ def get_date_and_guid(metadata):
         try:
             date = datetime(year=int(year), month=int(month), day=int(day))
         except ValueError as e:
-            logger.error(e)
             date = np.nan
     guid = match_pattern_in_block(GUID_PATTERN, metadata)
     return date, guid

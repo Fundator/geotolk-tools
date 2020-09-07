@@ -3,11 +3,9 @@ from .snd import process_snd
 from .prv import process_prv
 from .tlk import process_tlk
 from .helpers import merge_dfs
-import logging
 import os
 
 import pandas as pd
-logger = logging.getLogger(__name__)
 
 def process_multiple_by_path(path: str, location: str, project: str) -> dict:
     filenames = find_files_in_autograf_dbf(path)
@@ -55,19 +53,16 @@ def process_file_by_path(path: str) -> dict:
         try:
             file_dict = process_snd(lines)
         except Exception as e:
-            logger.warning(f"Could not process file {path}: {e}")
             file_dict = None
     elif filetype == "prv":
         try:
             file_dict = process_prv(lines)
         except Exception as e:
-            logger.warning(f"Could not process file {path}: {e}")
             file_dict = None
     elif filetype == "tlk":
         try:
             file_dict = process_tlk(lines)
         except Exception as e:
-            logger.warning(f"Could not process file {path}: {e}")
             file_dict = None
     else:
         raise ValueError("Invalid file type: {}".format(filetype))
@@ -83,19 +78,16 @@ def process_file_by_lines(lines: list, filename: str) -> dict:
         try:
             file_dict = process_snd(lines)
         except Exception as e:
-            logger.warning(f"Could not process file {filename}: {e}")
             file_dict = None
     elif filetype == "prv":
         try:
             file_dict = process_prv(lines)
         except Exception as e:
-            logger.warning(f"Could not process file {filename}: {e}")
             file_dict = None
     elif filetype == "tlk":
         try:
             file_dict = process_tlk(lines)
         except Exception as e:
-            logger.warning(f"Could not process file {filename}: {e}")
             file_dict = None
     else:
         raise ValueError("Invalid file type: {}".format(filetype))
