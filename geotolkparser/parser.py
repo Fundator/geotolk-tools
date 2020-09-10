@@ -50,10 +50,8 @@ def process_file_by_path(path: str) -> dict:
         lines = in_file.readlines()
 
     if filetype == "snd":
-        try:
-            file_dict = process_snd(lines)
-        except Exception as e:
-            file_dict = None
+        file_dict = process_snd(lines)
+        #file_dict = None
     elif filetype == "prv":
         try:
             file_dict = process_prv(lines)

@@ -1,1 +1,1 @@
-from .geotolkparser import process_multiple_by_path, process_multiple_by_lines, process_file_by_path, process_file_by_lines, convert_multiple_to_lines, convert_file_to_lines, dict_to_dataframes
+from .parser_v2 import parse_prv_file, parse_snd_file, parse_tlk_file, path_to_lines
