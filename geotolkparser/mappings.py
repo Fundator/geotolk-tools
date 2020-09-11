@@ -38,7 +38,7 @@ third_block_mapping = {
 data_block_metadata_mapping = {
     "data_block_first_line": {"index": 0, "nested": {
         "survey_type_code": {"index": 0, "dtype": int},
-        "date_of_sounding": {"index": 1, "dtype": lambda x: str(datetime.strptime(x, "%d.%m.%Y"))},
+        "date_of_survey": {"index": 1, "dtype": lambda x: str(datetime.strptime(x, "%d.%m.%Y"))},
         }
     },
     "data_block_second_line": {"index": 1, "nested": {
@@ -102,7 +102,7 @@ tlk_data_mapping = {
     }
 }
 
-unknown_block_mapping = {"unknown_unknown_1": {"index": 0, "dtype": int},
+cpt_unknown_block_mapping = {"unknown_unknown_1": {"index": 0, "dtype": int},
                          "NA1": {"index": 1, "nested": {"NA1": {"index": 1, "dtype": float}}},
                          "NB1": {"index": 2, "nested": {"NB1": {"index": 1, "dtype": float}}},
                          "NC1": {"index": 3, "nested": {"NC1": {"index": 1, "dtype": float}}},
@@ -132,7 +132,7 @@ prv_metadata_mapping = {
 
 
 prv_data_mapping = {
-    "prove_nr": {"index": 0, "dtype": int},
+    "prove_nr": {"index": 0, "dtype": lambda x: int(x) if x.isdigit() else np.nan},
     "symbol": {"index": 1, "dtype": int},
     "dybde": {"index": 2, "dtype": float},
     "w": {"index": 3, "dtype": float},

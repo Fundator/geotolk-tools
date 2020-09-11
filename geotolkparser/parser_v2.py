@@ -29,7 +29,7 @@ def _parse_data_block(block: list, mapping: dict, line_split_func: Callable) -> 
         for key, value in mapping.items():
             try:
                 row[key] = value["dtype"](line_vals[value["index"]])
-            except IndexError:
+            except (IndexError, ValueError):
                 row[key] = np.nan
         parsed_lines.append(row)
     return parsed_lines
@@ -123,9 +123,9 @@ def _extract_and_add_symbol_text(data: list) -> list:
 def _is_unknown_metadata_block(block: list) -> bool:
     try:
         _parse_metadata_block(block, unknown_block_mapping)
+        return True
     except Exception:
         return False
-    return True
 
 
 def _get_data_block_survey_type(data_block_metadata: dict, survey_type_key: str="survey_type_code") -> int:
@@ -257,8 +257,8 @@ def _label_from_symbol(symbol: int) -> list:
     elif symbol > 0:
         label = [_SYMBOL_LABELS_POS[int(i)] for i in str(symbol)]
     else:
-        label = np.nan
-    return label or np.nan
+        label = []
+    return label or []
 
 
 def parse_tlk_file(lines: list) -> list:
@@ -276,7 +276,7 @@ def parse_tlk_file(lines: list) -> list:
     return rows
 
 
-def parse_snd_file(lines: list) -> dict:
+def parse_snd_file(lines: list, data_block_start_index: int=3) -> dict:
     # first, split the lines into blocks
     blocks = _get_blocks(lines)
     # We know that the first block is always present for .SND files
@@ -285,29 +285,35 @@ def parse_snd_file(lines: list) -> dict:
     second_block = _parse_metadata_block(blocks[1], second_block_mapping)
     # We also know that the third block is always present
     third_block = _parse_metadata_block(blocks[2], third_block_mapping)
+    # Merge the three first blocks to one dictionary
+    snd_metadata = {**first_block, **second_block, **third_block}
     # After this, we dont know what we get, we can get either a tot, a cpt, both or none, so we loop through the remaining blocks to see what we find
-    data_blocks = []
+    data_blocks = {}
     unknown_metadata_block = None
     errors = []
-    for block in blocks[3:]:
+    for current_block_index, block in enumerate(blocks[data_block_start_index:]):
         if _is_data_block(block):
             try:
                 metadata, data = _parse_unknown_data_block(block)
-                data = _convert_comment_codes_to_indicator_columns(data)
-                data_blocks.append({"metadata": metadata, "data": data})
+                survey_type = metadata["survey_type_code"]
+
+                # If the survey type was CPT, we know that an unknown metadata file is attached at the end. We also suppose that the CPT is the last data block in the SND file, so we can finish up the file
+                if survey_type == 7:
+                    cpt_unknown_metadata_block = blocks[data_block_start_index + current_block_index]
+                    cpt_unknown_metadata = _parse_metadata_block(cpt_unknown_metadata_block, cpt_unknown_block_mapping)
+                    metadata = {**metadata, **cpt_unknown_metadata}
+                    data_blocks["cpt"] = {"metadata": metadata, "data": data}
+                    break
+
+                # For tot-files, we need to convert the comment codes to indicator columns
+                elif survey_type == 25:
+                    data = _convert_comment_codes_to_indicator_columns(data)
+                    data_blocks["tot"] = {"metadata": metadata, "data": data}
             except ValueError as e:
                 errors.append(e)
-        elif _is_unknown_metadata_block(block):
-            try:
-                unknown_metadata_block = _parse_metadata_block(block, unknown_block_mapping)
-            except ValueError as e:
-                errors.append(e)                
     return {
-        "first_metadata_block": first_block,
-        "second_metadata_block": second_block,
-        "third_metadata_block": third_block,
+        "metadata": snd_metadata,
         "data_blocks": data_blocks,
-        "unknown_metadata_block": unknown_metadata_block,
         "errors": errors
            }
 
