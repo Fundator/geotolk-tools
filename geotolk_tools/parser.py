@@ -1,6 +1,18 @@
 import numpy as np
 from typing import Callable, Tuple, List
 from .mappings import *
+from uuid import uuid4
+
+_KNOWN_SURVEY_CODES = [7, 10, 21, 22,  23, 24,  25, 26]
+
+
+_DATETIME_FMTS = [
+    "%d.%m.%Y",
+    "%Y-%m-%d",
+    "%Y%m0%d",
+    "%d.%m.%y",
+    "%Y-%d-%m"
+]
 
 
 def _parse_metadata_block(block: list, mapping: dict) -> dict:
@@ -11,7 +23,7 @@ def _parse_metadata_block(block: list, mapping: dict) -> dict:
                 try:
                     line_vals = block[value1["index"]].split()
                     block_parsed[key2] = value2["dtype"](line_vals[value2["index"]])
-                except IndexError:
+                except (IndexError, ValueError):
                     block_parsed[key2] = np.nan
         else:
             try:
@@ -77,21 +89,43 @@ def _parse_unknown_data_block(block: list) -> Tuple[dict, list]:
     elif survey_type == 7:
         data = _parse_data_block(data_lines, cpt_data_mapping, _cpt_split_func)
     else:
-        msg = f"Unknown survey_type {survey_type}"
+        msg = f"Unknown survey_type {survey_type}" 
+        print(msg)
         raise ValueError(msg)
     
     return metadata, data
 
 
+def _try_parse_datetime(datestr: str) -> datetime:
+    for fmt in _DATETIME_FMTS:
+        try:
+            return datetime.strptime(datestr, fmt)
+        except ValueError:
+            continue
+    print("No format matches")
+    raise ValueError(f"Could not parse string as datetime {datestr}")
+
+
 def _is_data_block(block: list) -> bool:
+    # Data blocks is characterized by the first line containing the survey code and the date
+    # Check the first line
+    first_line = block[0]
+    first_line_vals = first_line.split()
+    if len(first_line_vals) != 2:
+        return False
+    survey_code = first_line_vals[0]
+    date = first_line_vals[1]
     try:
-        _, data = _parse_unknown_data_block(block)
-        return True
+        if survey_code.isdigit() and int(survey_code) in _KNOWN_SURVEY_CODES:
+            _ = _try_parse_datetime(date)
+            return True
     except Exception:
+        print("Had trouble parsing dates")
+        if date.isdigit():
+            print("Someone must have modified the date, oops")
+            return True
         return False
-    if not data:
-        return False
-    return True
+    return False
 
 
 def _is_unknown_material(block):
@@ -169,7 +203,8 @@ def _get_blocks(lines: list) -> list:
             current_block.append(line)
     if current_block:
         blocks.append(current_block)
-    return blocks
+    # Remove empty blocks
+    return [b for b in blocks if b]
 
 
 def _modify_indicator_by_code(code: int, indicators: dict) -> dict:
@@ -237,6 +272,16 @@ def _convert_comment_codes_to_indicator_columns(parsed_snd_block: list) -> dict:
     return res
 
 
+def _initialize_empty_mapping(mapping: dict) -> dict:
+    block_parsed = {}
+    for key1, value1 in mapping.items():
+        if "nested" in value1.keys():
+            for key2, _ in value1["nested"].items():
+                    block_parsed[key2] = np.nan
+        else:
+                block_parsed[key1] = np.nan
+    return block_parsed    
+
 def _label_from_symbol(symbol: int) -> list:
     """
     Convert Geosuite's 'symbol' column to a list of labels.
@@ -259,6 +304,9 @@ def _label_from_symbol(symbol: int) -> list:
 
 
 def parse_tlk_file(lines: list) -> list:
+    # Check for empty file (no lines)
+    if not lines:
+        return []
     #First, split lines into blocks/rows
     blocks = _split_tlk_to_blocks(lines)
     #Then, go through each block and parse
@@ -273,21 +321,56 @@ def parse_tlk_file(lines: list) -> list:
     return rows
 
 
-def parse_snd_file(lines: list, data_block_start_index: int=3) -> dict:
+def parse_snd_file(lines: list, min_blocks: int=3) -> dict:
+    # Initialize list of errors
+    errors = []
+
+    # Create index going through blocks
+    block_index = 0
     # first, split the lines into blocks
     blocks = _get_blocks(lines)
+    # Check that we at least have 3 blocks. If we dont return the errors
+    if len(blocks) < min_blocks:
+        msg = f"File contains less than {min_blocks} blocks. Cannot parse"
+        print(msg)
+        errors.append(msg)
+        metadata ={
+                **_initialize_empty_mapping(first_block_mapping),
+                **_initialize_empty_mapping(second_block_mapping),
+                **_initialize_empty_mapping(third_block_mapping)
+                }
+        metadata["guid"] = uuid4() 
+        return {"metadata": metadata, "data_blocks": {}, "errors": errors}
+
     # We know that the first block is always present for .SND files
-    first_block = _parse_metadata_block(blocks[0], first_block_mapping)
+    first_block = _parse_metadata_block(blocks[block_index], first_block_mapping)
+    block_index += 1
     # We also know that the second block is always present
-    second_block = _parse_metadata_block(blocks[1], second_block_mapping)
-    # We also know that the third block is always present
-    third_block = _parse_metadata_block(blocks[2], third_block_mapping)
+    try:
+        second_block = _parse_metadata_block(blocks[block_index], second_block_mapping)
+        block_index += 1
+    except ValueError:
+        msg = f"File doesnt contain second metadatablock. Cannot parse"
+        print(msg)
+        errors.append(msg)
+        metadata ={
+                **_initialize_empty_mapping(first_block_mapping),
+                **_initialize_empty_mapping(second_block_mapping),
+                **_initialize_empty_mapping(third_block_mapping)
+                }
+        metadata["guid"] = uuid4() 
+        return {"metadata": metadata, "data_blocks": {}, "errors": errors}
+    # In some old formats, the third metadata block containing guid is missing
+    # We check if the third block can be parsed as data. If we can't we assume its a metadata block
+    third_block = _initialize_empty_mapping(third_block_mapping)
+    if not _is_data_block(blocks[block_index]):
+        third_block = _parse_metadata_block(blocks[block_index], third_block_mapping)
+        block_index += 1
     # Merge the three first blocks to one dictionary
     snd_metadata = {**first_block, **second_block, **third_block}
     # After this, we dont know what we get, we can get either a tot, a cpt, both or none, so we loop through the remaining blocks to see what we find
     data_blocks = {}
-    errors = []
-    for current_block_index, block in enumerate(blocks[data_block_start_index:]):
+    for current_block_index, block in enumerate(blocks[block_index:]):
         if _is_data_block(block):
             try:
                 metadata, data = _parse_unknown_data_block(block)
@@ -295,7 +378,7 @@ def parse_snd_file(lines: list, data_block_start_index: int=3) -> dict:
 
                 # If the survey type was CPT, we know that an unknown metadata file is attached at the end. We also suppose that the CPT is the last data block in the SND file, so we can finish up the file
                 if survey_type == 7:
-                    cpt_unknown_metadata_block = blocks[data_block_start_index + current_block_index + 1]
+                    cpt_unknown_metadata_block = blocks[block_index + current_block_index + 1]
                     cpt_unknown_metadata = _parse_metadata_block(cpt_unknown_metadata_block, cpt_unknown_block_mapping)
                     metadata = {**metadata, **cpt_unknown_metadata}
                     data_blocks["cpt"] = {"metadata": metadata, "data": data}
@@ -319,10 +402,18 @@ def parse_prv_file(lines: list) -> dict:
     blocks = _get_blocks(lines)
     # We know that the first block contains metadata
     metadata = _parse_metadata_block(blocks[0], prv_metadata_mapping)
-    # We know that the second block contains the data
-    data = _parse_data_block(blocks[1], prv_data_mapping, _prv_split_func)
-    # We want to translate the symbols to soil types
-    data = _extract_and_add_symbol_text(data)
+    # If we have only one block, data is none
+    if len(blocks) < 2:
+        data = []
+        print("PRV contains less than 2 blocks")
+    else:
+        # We know that the second block contains the data
+        try:
+            data = _parse_data_block(blocks[1], prv_data_mapping, _prv_split_func)
+            # We want to translate the symbols to soil types
+            data = _extract_and_add_symbol_text(data)
+        except ValueError:
+            data = []
     
     return {"metadata": metadata, "data": data}
 

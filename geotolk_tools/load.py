@@ -1,9 +1,12 @@
 import sys
 import os
+import re
 from typing import List
 from .parser import parse_snd_file, parse_tlk_file, parse_prv_file, path_to_lines
 
 _VALID_FILETYPES = [".snd", ".tlk", ".prv"]
+_PR_PATTERN = re.compile(".*PR([^\-]).*(SND|snd)")
+
 
 def _find_filenames_in_folder(path: str) -> List[str]:
     return os.listdir(path)
@@ -23,6 +26,7 @@ def _associate_filenames_in_folder(filenames: List[str]) -> dict:
             full_filename_prefix = full_filename[:-4]
             if full_filename_prefix == unique_filename:
                 grouped_filenames.append(full_filename)
+        grouped_filenames = _remove_incomplete_files(grouped_filenames)
         grouped_filenames = _prune_filetypes(grouped_filenames)
         grouped_filenames = _remove_filenames_without_snd_file(grouped_filenames)
         if grouped_filenames:            
@@ -41,6 +45,10 @@ def _prune_filetypes(files: List[str]) -> List[str]:
     # Remove files with invalid filetypes from the list
     return [f for f in files if f[-4:].lower() in _VALID_FILETYPES]
 
+def _remove_incomplete_files(files: List[str]) -> List[str]:
+    # Remove files containing PR.SND (except PR-*.SND for some reason...)
+    return [f for f in files if not _PR_PATTERN.match(f)]
+
 def load_folder(folder_path: str) -> dict:
     # Find all filenames in the folder
     filenames = _find_filenames_in_folder(folder_path)
@@ -56,6 +64,7 @@ def load_folder(folder_path: str) -> dict:
         tlk = None
         # For each file in group
         for file in related_files:
+            print(file)
             # Get absolute path to file
             path = os.path.join(folder_path, file)
 
@@ -80,7 +89,7 @@ def load_folder(folder_path: str) -> dict:
         if tlk:
             snd["data_blocks"]["tlk"] = tlk
         
-        guid = snd["metadata"]["GUID_geosuite"]
+        guid = snd["metadata"]["guid"]
         folder_data[guid] = snd
     return folder_data
 

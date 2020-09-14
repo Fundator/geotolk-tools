@@ -27,10 +27,10 @@ second_block_mapping= {
 
 third_block_mapping = {
     "third_block_unknown_1": {"index": 0, "dtype": int},
-    "GUID": {"index": 1, "nested": {"GUID_geosuite": {"index": 1, "dtype": str}
+    "guid": {"index": 1, "nested": {"guid": {"index": 1, "dtype": str}
                                    }
             },
-    "third_block_unknown_guid": {"index": 2, "dtype": str},
+    "guid_2": {"index": 2, "dtype": str},
     "project_name": {"index": 3, "dtype": str},
     "filename": {"index": 4, "dtype": str}
 }
@@ -38,7 +38,7 @@ third_block_mapping = {
 data_block_metadata_mapping = {
     "data_block_first_line": {"index": 0, "nested": {
         "survey_type_code": {"index": 0, "dtype": int},
-        "date_of_survey": {"index": 1, "dtype": lambda x: str(datetime.strptime(x, "%d.%m.%Y"))},
+        "date": {"index": 1, "dtype": lambda x: str(datetime.strptime(x, "%d.%m.%Y"))},
         }
     },
     "data_block_second_line": {"index": 1, "nested": {
@@ -48,8 +48,8 @@ data_block_metadata_mapping = {
         "data_block_unknown_2_3": {"index": 3, "dtype": int},
         "data_block_unknown_2_4": {"index": 4, "dtype": int},
         "lopenummer": {"index": 5, "dtype": int},
-        "tot_filename": {"index": 6, "dtype": lambda x: str(x).replace("*", " ") if x != "GUID" else np.nan},
-        "tot_guid": {"index": -1, "dtype": str}
+        "filename": {"index": 6, "dtype": lambda x: str(x).replace("*", " ") if x != "GUID" else np.nan},
+        "guid": {"index": -1, "dtype": str}
         }
     }
 }
@@ -87,7 +87,7 @@ tlk_data_mapping = {
     "line2": {
         "index": 1, "nested": {
             "kote": {"index": 0, "dtype": float},
-            "kommentar_tlk": {"index": 1, "dtype": str}
+            "kommentar": {"index": 1, "dtype": str}
         }
     },  
     "line3": {
@@ -123,9 +123,9 @@ prv_metadata_mapping = {
         "index": 0, "nested": {
             "value1": {"index": 0, "dtype": str},
             "value2": {"index": 1, "dtype": float},
-            "date_prv": {"index": 2, "dtype": lambda x: str(datetime.strptime(x, "%d.%m.%Y"))},
+            "date": {"index": 2, "dtype": lambda x: str(datetime.strptime(x, "%d.%m.%Y")) if not x.isdigit() else np.nan},
             "value3": {"index": 3, "dtype": int},
-            "prv_guid": {"index": 5, "dtype": str}
+            "guid": {"index": 5, "dtype": str}
             }
         }
     }
