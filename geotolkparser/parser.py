@@ -1,119 +1,358 @@
-from .load import process_file, get_id, find_files_in_autograf_dbf, make_dataframes
-from .snd import process_snd
-from .prv import process_prv
-from .tlk import process_tlk
-from .helpers import merge_dfs
-import os
+import numpy as np
+from typing import Callable, Tuple, List
+from .mappings import *
 
-import pandas as pd
 
-def process_multiple_by_path(path: str, location: str, project: str) -> dict:
-    filenames = find_files_in_autograf_dbf(path)
-    processed_files = {}
+def _parse_metadata_block(block: list, mapping: dict) -> dict:
+    block_parsed = {}
+    for key1, value1 in mapping.items():
+        if "nested" in value1.keys():
+            for key2, value2 in value1["nested"].items():
+                try:
+                    line_vals = block[value1["index"]].split()
+                    block_parsed[key2] = value2["dtype"](line_vals[value2["index"]])
+                except IndexError:
+                    block_parsed[key2] = np.nan
+        else:
+            try:
+                block_parsed[key1] = value1["dtype"](block[value1["index"]])
+            except IndexError:
+                block_parsed[key1] = np.nan
+    return block_parsed
+
+
+def _parse_data_block(block: List[str], mapping: dict, line_split_func: Callable) -> List[dict]:
+    parsed_lines = []
+    for line in block:
+        row = {}
+        line_vals = line_split_func(line)
+        for key, value in mapping.items():
+            try:
+                row[key] = value["dtype"](line_vals[value["index"]])
+            except (IndexError, ValueError):
+                row[key] = np.nan
+        parsed_lines.append(row)
+    return parsed_lines
+
+
+def _tot_split_func(line: str) -> List[str]:
+    return line.split()
+
+
+def _prv_split_func(line: str) -> List[str]:
+    return line.split()
+
+
+def _cpt_split_func(line: str, comment_char_length: int=25) -> list:
+    # split line on whitespace to get four first values
+    first_values = line.split()[:4]
+    # find index of the fourth value in string
+    index_str = f" {first_values[-1]} "
+    fourth_index = line.index(index_str)
+    # Extract the comment with fixed max character length
+    start_index_comment = fourth_index + len(first_values[-1]) + 1
+    stop_index_comment = start_index_comment + comment_char_length
+    comment = line[start_index_comment:stop_index_comment]
+    #split the last potential four values in the same way as the first
+    last_values = line[stop_index_comment:].split()
+    # concatenate the lists to one list
+    return list(first_values) + [str(comment).strip()] + list(last_values)
+
+
+def _parse_unknown_data_block(block: list) -> Tuple[dict, list]:
+    # We know that data blocks has metadata in the two first lines
+    metadata_lines = block[:2]
+    # The data is contained in the remaining lines
+    data_lines = block[2:]
+
+    # Get metadata
+    metadata = _parse_metadata_block(metadata_lines, data_block_metadata_mapping)
+    # Find out which type of data block it is
+    survey_type = _get_data_block_survey_type(metadata)
     
-    for filename in filenames:
-        proc = process_file(path, filename)
-        if proc is not None:
-            _id = get_id(location, project, filename)
-            file_list = processed_files.get(_id, [])
-            processed_files[_id] = file_list + [proc]
-
-    return processed_files
-
-def process_multiple_by_lines(list_of_lines: list, location: str, project: str) -> dict:
-    processed_files = {}
-    for file in list_of_lines:
-        data = file["data"]
-        filename = file["name"]
-        proc = process_file_by_lines(data, filename)
-        if proc is not None:
-            _id = get_id(location, project, filename)
-            file_list = processed_files.get(_id, [])
-            processed_files[_id] = file_list + [proc]
-
-    return processed_files
-
-def process_file_by_path(path: str) -> dict:
-    """
-    Process 'filename' located at 'path' Must be either a .snd/SND, .PRV, or .TLK file.
-
-    :param path: Path to file
-    :type path: str
-    :param filename: Name of file
-    :type filename: str
-    :return: Dict with data from the processed file.
-    :rtype: dict
-    """
-    filetype = path[-3:].lower()
-
-    with open(path, "r", errors="ignore") as in_file:
-        lines = in_file.readlines()
-
-    if filetype == "snd":
-        file_dict = process_snd(lines)
-        #file_dict = None
-    elif filetype == "prv":
-        try:
-            file_dict = process_prv(lines)
-        except Exception as e:
-            file_dict = None
-    elif filetype == "tlk":
-        try:
-            file_dict = process_tlk(lines)
-        except Exception as e:
-            file_dict = None
+    # Total soundings (code 25)
+    if survey_type == 25:
+        data = _parse_data_block(data_lines, tot_data_mapping, _tot_split_func)
+    # CPT (code 7)
+    elif survey_type == 7:
+        data = _parse_data_block(data_lines, cpt_data_mapping, _cpt_split_func)
     else:
-        raise ValueError("Invalid file type: {}".format(filetype))
+        msg = f"Unknown survey_type {survey_type}"
+        raise ValueError(msg)
+    
+    return metadata, data
 
-    if file_dict is not None:
-        file_dict["filename"] = path.split("\\")[-1]
-    return file_dict
 
-def process_file_by_lines(lines: list, filename: str) -> dict:
-    filetype = filename[-3:].lower()
+def _is_data_block(block: list) -> bool:
+    try:
+        _, data = _parse_unknown_data_block(block)
+        return True
+    except Exception:
+        return False
+    if not data:
+        return False
+    return True
 
-    if filetype == "snd":
-        try:
-            file_dict = process_snd(lines)
-        except Exception as e:
-            file_dict = None
-    elif filetype == "prv":
-        try:
-            file_dict = process_prv(lines)
-        except Exception as e:
-            file_dict = None
-    elif filetype == "tlk":
-        try:
-            file_dict = process_tlk(lines)
-        except Exception as e:
-            file_dict = None
+
+def _is_unknown_material(block):
+    # if material is "Annet", no material_text1 is present
+    # This is the last value in the first line
+    material_text_2 = block[0].split()[-1]
+    if material_text_2 == "Annet":
+        return True
+    return False
+
+
+def _add_empty_value_as_material_text_1(block):
+    #For the first line, we need to add a "None" in the start
+    temp_block = block.copy()
+    temp_block[0] = "None" + temp_block[0]
+    return temp_block
+
+
+def _extract_and_add_symbol_text(data: list) -> list:
+    temp_data = data.copy()
+    for row in temp_data:
+        symbol = row["symbol"]
+        soiltypes = _label_from_symbol(symbol)
+        row["symbol_soiltype"] = " ".join(soiltypes)
+    return temp_data
+
+
+def _is_unknown_metadata_block(block: list) -> bool:
+    try:
+        _parse_metadata_block(block, cpt_unknown_block_mapping)
+        return True
+    except Exception:
+        return False
+
+
+def _get_data_block_survey_type(data_block_metadata: dict, survey_type_key: str="survey_type_code") -> int:
+    if survey_type_key not in data_block_metadata.keys():
+        raise IndexError(f"Key {survey_type_key} not found in the metadata")
     else:
-        raise ValueError("Invalid file type: {}".format(filetype))
+        return data_block_metadata[survey_type_key]
+    
 
-    if file_dict is not None:
-        file_dict["filename"] = filename
-    return file_dict
+def _split_tlk_to_blocks(lines: list) -> list:
+    # Each interpretation in a .tlk file spans three lines. The file is always ended with a *
+    blocks = []
+    block = []
+    c = 0
+    for line in lines:
+        if line == "*":
+            break
+        if c == 3:
+            blocks.append(block)
+            block = []
+            c = 0
+        block.append(line)
+        c += 1
+    blocks.append(block)
+    return blocks
 
 
-
-# Convenience functions to convert paths to lines (lines in a txt file)
-
-def convert_multiple_to_lines(path: str) -> list:
-    files = find_files_in_autograf_dbf(path)
-    return [{"data": convert_file_to_lines(os.path.join(path, f)), "name": f} for f in files]
- 
-def convert_file_to_lines(path: str) -> list:
+def path_to_lines(path: str) -> list:
     with open(path, "r") as f:
-        return f.readlines()
+        lines = f.readlines()
+    lines = [l.replace("\n", "") for l in lines]
+    return lines
 
 
-# Function to convert dictionary to dataframes
+def _get_blocks(lines: list) -> list:
+    blocks, current_block = [], []
+    for line in lines:
+        if line == "*":
+            blocks.append(current_block)
+            current_block = []
+        else:
+            current_block.append(line)
+    if current_block:
+        blocks.append(current_block)
+    return blocks
 
-def dict_to_dataframes(file_dict: dict) -> pd.DataFrame:
-    if "type" in file_dict.keys():
-        if file_dict["type"] == "snd":
-            return file_dict["blocks"][0]["data"]
-        elif file_dict["type"] == "tlk":
-            return file_dict["data"]
+
+def _modify_indicator_by_code(code: int, indicators: dict) -> dict:
+    if code in geosuite_code_to_label.keys():
+        indicators["comment_label"].append(geosuite_code_to_label[code])
+    elif code == 70:
+        indicators["okt_rotasjon"] = 1
+    elif code == 71:
+        indicators["okt_rotasjon"] = 0
+    elif code == 72:
+        indicators["spyling"] = 1
+    elif code == 73:
+        indicators["spyling"] = 0
+    elif code == 74:
+        indicators["slag"] = 1
+    elif code == 75:
+        indicators["slag"] = 0
+    elif code == 76:
+        indicators["slag"] = 1
+        indicators["spyling"] = 1
+    elif code == 77:
+        indicators["slag"] = 0
+        indicators["spyling"] = 0
+    elif code == 78:
+        indicators["pumping"] = 1
+    elif code == 79:
+        indicators["pumping"] = 0
+    
+    return indicators
+
+
+def _convert_comment_codes_to_indicator_columns(parsed_snd_block: list) -> dict:
+    # Go through the rows of the datablock
+    temp_block = parsed_snd_block.copy()
+    res = []
+    for row in temp_block:
+        
+        # Initialize indicators
+        indicators = {
+            "okt_rotasjon": np.nan,
+            "spyling": np.nan,
+            "slag": np.nan,
+            "pumping": np.nan,
+            "comment_label": []
+        }
+        
+        # If we have a comment
+        comments = row["kommentar"]
+        if isinstance(comments, str):
+            # for each comment in comments
+            for code in comments.split():
+                # Convert textcodes to codes for convenience when going ahead
+                if code in geosuite_textcode_to_code.keys():
+                    code = geosuite_textcode_to_code[code]
+                # Check if it is a valid code
+                if code in geosuite_textcode_to_code.values():
+                    # If it is, then do actions based on the code
+                    indicators = _modify_indicator_by_code(int(code), indicators)
+        if indicators["comment_label"]:
+            indicators["comment_label"] = " ".join(indicators["comment_label"])
+        else:
+            indicators["comment_label"] = np.nan
+        row = {**row, **indicators}
+        res.append(row)
+    return res
+
+
+def _label_from_symbol(symbol: int) -> list:
+    """
+    Convert Geosuite's 'symbol' column to a list of labels.
+
+    :param symbol: Symbol
+    :type symbol: int | str
+    :return: Label list
+    :rtype: list of str | np.nan
+    """
+
+    symbol = int(symbol)
+    if symbol < 0:
+        bin_str = str(bin(abs(symbol)))[2:].zfill(13)
+        label = [_SYMBOL_LABELS_NEG[pos] for pos, bit in enumerate(reversed(bin_str)) if bit == "1"]
+    elif symbol > 0:
+        label = [_SYMBOL_LABELS_POS[int(i)] for i in str(symbol)]
     else:
-        return make_dataframes(file_dict)
+        label = []
+    return label or []
+
+
+def parse_tlk_file(lines: list) -> list:
+    #First, split lines into blocks/rows
+    blocks = _split_tlk_to_blocks(lines)
+    #Then, go through each block and parse
+    rows = []
+    for block in blocks:
+        #If we have "Annet" material we need to modify the data for parsing
+        if _is_unknown_material(block):
+            block = _add_empty_value_as_material_text_1(block)
+        #Now we can parse the file according to the mapping
+        row = _parse_metadata_block(block, tlk_data_mapping)
+        rows.append(row)
+    return rows
+
+
+def parse_snd_file(lines: list, data_block_start_index: int=3) -> dict:
+    # first, split the lines into blocks
+    blocks = _get_blocks(lines)
+    # We know that the first block is always present for .SND files
+    first_block = _parse_metadata_block(blocks[0], first_block_mapping)
+    # We also know that the second block is always present
+    second_block = _parse_metadata_block(blocks[1], second_block_mapping)
+    # We also know that the third block is always present
+    third_block = _parse_metadata_block(blocks[2], third_block_mapping)
+    # Merge the three first blocks to one dictionary
+    snd_metadata = {**first_block, **second_block, **third_block}
+    # After this, we dont know what we get, we can get either a tot, a cpt, both or none, so we loop through the remaining blocks to see what we find
+    data_blocks = {}
+    errors = []
+    for current_block_index, block in enumerate(blocks[data_block_start_index:]):
+        if _is_data_block(block):
+            try:
+                metadata, data = _parse_unknown_data_block(block)
+                survey_type = metadata["survey_type_code"]
+
+                # If the survey type was CPT, we know that an unknown metadata file is attached at the end. We also suppose that the CPT is the last data block in the SND file, so we can finish up the file
+                if survey_type == 7:
+                    cpt_unknown_metadata_block = blocks[data_block_start_index + current_block_index + 1]
+                    cpt_unknown_metadata = _parse_metadata_block(cpt_unknown_metadata_block, cpt_unknown_block_mapping)
+                    metadata = {**metadata, **cpt_unknown_metadata}
+                    data_blocks["cpt"] = {"metadata": metadata, "data": data}
+                    break
+
+                # For tot-files, we need to convert the comment codes to indicator columns
+                elif survey_type == 25:
+                    data = _convert_comment_codes_to_indicator_columns(data)
+                    data_blocks["tot"] = {"metadata": metadata, "data": data}
+            except Exception as e:
+                errors.append(e)
+    return {
+        "metadata": snd_metadata,
+        "data_blocks": data_blocks,
+        "errors": errors
+           }
+
+
+def parse_prv_file(lines: list) -> dict:
+    # First split lines into blocks
+    blocks = _get_blocks(lines)
+    # We know that the first block contains metadata
+    metadata = _parse_metadata_block(blocks[0], prv_metadata_mapping)
+    # We know that the second block contains the data
+    data = _parse_data_block(blocks[1], prv_data_mapping, _prv_split_func)
+    # We want to translate the symbols to soil types
+    data = _extract_and_add_symbol_text(data)
+    
+    return {"metadata": metadata, "data": data}
+
+
+_SYMBOL_LABELS_NEG = [
+    'Leire',
+    'Fyllemasse',
+    'Grus',
+    'Matjord',
+    'Berg',
+    'Sand',
+    'Skjell',
+    'Silt',
+    'Stein & blokk',
+    'Morene',
+    'Torv',
+    'Gytje, dy',
+    'Trerester'
+    'Kvikkleire'
+]
+_SYMBOL_LABELS_POS = [
+    np.nan,
+    "Leire",
+    "Silt",
+    "Sand",
+    "Grus",
+    "Stein",
+    "Fyllemasse",
+    "Matjord",
+    "Trerester",
+    "Skjell",
+    "Kvikkleire"
+]

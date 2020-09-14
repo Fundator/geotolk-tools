@@ -1,7 +1,7 @@
 import sys
 import os
 from typing import List
-from .parser_v2 import parse_snd_file, parse_tlk_file, parse_prv_file, path_to_lines
+from .parser import parse_snd_file, parse_tlk_file, parse_prv_file, path_to_lines
 
 VALID_FILETYPES = [".snd", ".tlk", ".prv"]
 
@@ -22,7 +22,6 @@ def associate_filenames_in_folder(filenames: List[str]) -> dict:
         for full_filename in filenames:
             full_filename_prefix = full_filename[:-4]
             if full_filename_prefix == unique_filename:
-                filetype = full_filename[-3:].lower()
                 grouped_filenames.append(full_filename)
         grouped_filenames = prune_filetypes(grouped_filenames)
         grouped_filenames = remove_filenames_without_snd_file(grouped_filenames)
@@ -50,7 +49,7 @@ def load_folder(folder_path: str) -> dict:
 
     folder_data = {}
     # For each group
-    for file_prefix, related_files in groups.items():
+    for _, related_files in groups.items():
         # Each group needs to at least have one SND file
         snd = None
         prv = None
