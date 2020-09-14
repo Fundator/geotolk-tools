@@ -3,12 +3,12 @@ import os
 from typing import List
 from .parser import parse_snd_file, parse_tlk_file, parse_prv_file, path_to_lines
 
-VALID_FILETYPES = [".snd", ".tlk", ".prv"]
+_VALID_FILETYPES = [".snd", ".tlk", ".prv"]
 
-def find_filenames_in_folder(path: str) -> List[str]:
+def _find_filenames_in_folder(path: str) -> List[str]:
     return os.listdir(path)
 
-def associate_filenames_in_folder(filenames: List[str]) -> dict:
+def _associate_filenames_in_folder(filenames: List[str]) -> dict:
     # Split filenames into prefix (filename) and suffix (.snd/.tlk/.prv etc)
     # Usually the last four characters is the suffix, and the previous is the prefix
     # Get all unique prefixes:
@@ -23,29 +23,29 @@ def associate_filenames_in_folder(filenames: List[str]) -> dict:
             full_filename_prefix = full_filename[:-4]
             if full_filename_prefix == unique_filename:
                 grouped_filenames.append(full_filename)
-        grouped_filenames = prune_filetypes(grouped_filenames)
-        grouped_filenames = remove_filenames_without_snd_file(grouped_filenames)
+        grouped_filenames = _prune_filetypes(grouped_filenames)
+        grouped_filenames = _remove_filenames_without_snd_file(grouped_filenames)
         if grouped_filenames:            
             associated_files[unique_filename] = grouped_filenames
 
     return associated_files
 
-def remove_filenames_without_snd_file(files: List[str]) -> List[str]:
+def _remove_filenames_without_snd_file(files: List[str]) -> List[str]:
     # If none of the files ends with .snd, ignore the rest of the files
     for filename in files:
         if filename[-4:].lower() == ".snd":
             return files
     return []
 
-def prune_filetypes(files: List[str]) -> List[str]:
+def _prune_filetypes(files: List[str]) -> List[str]:
     # Remove files with invalid filetypes from the list
-    return [f for f in files if f[-4:].lower() in VALID_FILETYPES]
+    return [f for f in files if f[-4:].lower() in _VALID_FILETYPES]
 
 def load_folder(folder_path: str) -> dict:
     # Find all filenames in the folder
-    filenames = find_filenames_in_folder(folder_path)
+    filenames = _find_filenames_in_folder(folder_path)
     # Group the different files based on filename (before filetype)
-    groups = associate_filenames_in_folder(filenames)
+    groups = _associate_filenames_in_folder(filenames)
 
     folder_data = {}
     # For each group
