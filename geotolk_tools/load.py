@@ -1,3 +1,4 @@
+from collections import defaultdict
 import sys
 import os
 import re
@@ -8,31 +9,17 @@ _VALID_FILETYPES = [".snd", ".tlk", ".prv"]
 _PR_PATTERN = re.compile(".*PR([^\-]).*(SND|snd)")
 
 
+if sys.platform == "linux" or sys.platform == "linux2":
+    _os = "linux"
+    _SEPARATOR = "/"
+elif sys.platform == "win32":
+    _os = "win"
+    _SEPARATOR = "\\"
+
+
 def _find_filenames_in_folder(path: str) -> List[str]:
     return os.listdir(path)
 
-def _associate_filenames_in_folder(filenames: List[str]) -> dict:
-    # Split filenames into prefix (filename) and suffix (.snd/.tlk/.prv etc)
-    # Usually the last four characters is the suffix, and the previous is the prefix
-    # Get all unique prefixes:
-    prefixes = set([f[:-4] for f in filenames])
-
-    #For each unique prefix, find all files with that prefix
-    associated_files = {}
-
-    for unique_filename in prefixes:
-        grouped_filenames = []        
-        for full_filename in filenames:
-            full_filename_prefix = full_filename[:-4]
-            if full_filename_prefix == unique_filename:
-                grouped_filenames.append(full_filename)
-        grouped_filenames = _remove_incomplete_files(grouped_filenames)
-        grouped_filenames = _prune_filetypes(grouped_filenames)
-        grouped_filenames = _remove_filenames_without_snd_file(grouped_filenames)
-        if grouped_filenames:            
-            associated_files[unique_filename] = grouped_filenames
-
-    return associated_files
 
 def _remove_filenames_without_snd_file(files: List[str]) -> List[str]:
     # If none of the files ends with .snd, ignore the rest of the files
@@ -49,50 +36,67 @@ def _remove_incomplete_files(files: List[str]) -> List[str]:
     # Remove files containing PR.SND (except PR-*.SND for some reason...)
     return [f for f in files if not _PR_PATTERN.match(f)]
 
+def _remove_CPTU_files(files: List[str]) -> List[str]:
+    # Remove CPTU files. They can be found by having CPTU in their name
+    return [f for f in files if "cptu" not in f.lower()]
+
+
+def _get_oppdragsnr(oppdragsnr: str) -> int:
+    return int(oppdragsnr.split("_")[-1])
+
+def _sanitize_filename(filename: str) -> str:
+    # First remove file ending
+    prefix = filename[:-4]
+    # Then remove special filename conventions from old versions
+    for code in ["cpt", "prv", "pr", "tot"]:
+        if code in prefix.lower():
+            # remove special characters 
+            prefix = "".join(e for e in prefix if e.isalnum())
+            # remove upper and lower case versions of the code
+            prefix = prefix.replace(code.lower(), "")
+            prefix = prefix.replace(code.upper(), "")
+    return prefix
+
+def _create_id(path: str) -> dict:
+    split_str = path.split(_SEPARATOR)
+    filename = split_str[-1]
+    oppdragsnr_raw = split_str[-3]
+    oppdragsnr = _get_oppdragsnr(oppdragsnr_raw)
+    borehole_id = _sanitize_filename(filename)
+    return {"oppdragsnr": oppdragsnr, "borehole_id": borehole_id, "filename": filename}
+
+_FILEPARSER = {
+    "snd": parse_snd_file,
+    "prv": parse_prv_file,
+    "tlk": parse_tlk_file
+}
+
 def load_folder(folder_path: str) -> dict:
-    # Find all filenames in the folder
+    # Find all filenams in the folder
     filenames = _find_filenames_in_folder(folder_path)
-    # Group the different files based on filename (before filetype)
-    groups = _associate_filenames_in_folder(filenames)
 
-    folder_data = {}
-    # For each group
-    for _, related_files in groups.items():
-        # Each group needs to at least have one SND file
-        snd = None
-        prv = None
-        tlk = None
-        # For each file in group
-        for file in related_files:
-            print(file)
-            # Get absolute path to file
-            path = os.path.join(folder_path, file)
+    # Remove unwanted files
+    filenames = _remove_CPTU_files(filenames)
+    filenames = _prune_filetypes(filenames)
+    filenames = _remove_incomplete_files(filenames)
+    # Initialize dict to hold all files with a defaultdict with lists
+    folder_data = defaultdict(list)
 
-            # Read lines
-            lines = path_to_lines(path)
-
-            #Get suffix to get filetype
-            file_type = file[-3:].lower()
-            # Process file based on file type. We dont know the order of the files, so we merge them at the end
-            if file_type == "snd":
-                snd = parse_snd_file(lines)
-            if file_type == "prv":
-                prv = parse_prv_file(lines)
-            if file_type == "tlk":
-                tlk = parse_tlk_file(lines)
-
-        if not snd:
-            raise ValueError("No snd file found")
-        
-        if prv:
-            snd["data_blocks"]["prv"] = prv
-        if tlk:
-            snd["data_blocks"]["tlk"] = tlk
-        
-        guid = snd["metadata"]["guid"]
-        folder_data[guid] = snd
+    # Loop through each file
+    for file in filenames:
+        # Get absolute path
+        abspath = os.path.join(folder_path, file)
+        # Create ID
+        _id = _create_id(abspath)
+        # Create unique identifier by joining oppdragsnr and borehole id
+        uid = f"{_id['oppdragsnr']}_{_id['borehole_id']}"
+        # Read the lines
+        lines = path_to_lines(abspath)
+        # Get filetype
+        file_type = file[-3:].lower()
+        # Use the defined file parser for the specific file type
+        parsed = _FILEPARSER[file_type](lines)
+        parsed = {**_id, **parsed}
+        folder_data[uid].append(parsed)
     return folder_data
-
-
-
 

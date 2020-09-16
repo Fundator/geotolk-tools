@@ -32,7 +32,7 @@ third_block_mapping = {
             },
     "guid_2": {"index": 2, "dtype": str},
     "project_name": {"index": 3, "dtype": str},
-    "filename": {"index": 4, "dtype": str}
+    "original_filename": {"index": 4, "dtype": str}
 }
 
 data_block_metadata_mapping = {
@@ -48,7 +48,7 @@ data_block_metadata_mapping = {
         "data_block_unknown_2_3": {"index": 3, "dtype": int},
         "data_block_unknown_2_4": {"index": 4, "dtype": int},
         "lopenummer": {"index": 5, "dtype": int},
-        "filename": {"index": 6, "dtype": lambda x: str(x).replace("*", " ") if x != "GUID" else np.nan},
+        "original_filename": {"index": 6, "dtype": lambda x: str(x).replace("*", " ") if x != "GUID" else np.nan},
         "guid": {"index": -1, "dtype": str}
         }
     }
@@ -144,7 +144,7 @@ prv_data_mapping = {
     "bruddef_pct": {"index": 9, "dtype": int},
     "gamma": {"index": 10, "dtype": float},
     "glodetap": {"index": 11, "dtype": float},
-    "jordart": {"index": slice(12,None), "dtype": lambda x: " ".join(x)}
+    "jordart": {"index": slice(12,None), "dtype": lambda x: " ".join(x) if x else np.nan}
 }
 
 geosuite_textcode_to_code = {
