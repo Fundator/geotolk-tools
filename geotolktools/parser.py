@@ -348,7 +348,7 @@ def parse_snd_file(lines: list, min_blocks: int=3) -> dict:
     if len(blocks) < min_blocks:
         msg = f"File contains less than {min_blocks} blocks. Cannot parse"
         errors.append(msg)
-        return {"type": "snd", **metadata, "data_blocks": [], "errors": errors}
+        return {"type": "snd", **metadata, "blocks": [], "errors": errors}
 
     # We know that the first block is always present for .SND files
     first_block = _parse_metadata_block(blocks[block_index], first_block_mapping)
@@ -360,7 +360,7 @@ def parse_snd_file(lines: list, min_blocks: int=3) -> dict:
     except ValueError:
         msg = f"File doesnt contain second metadatablock. Cannot parse"
         errors.append(msg)
-        return {"type": "snd", **metadata, "data_blocks": [], "errors": errors}
+        return {"type": "snd", **metadata, "blocks": [], "errors": errors}
     # In some old formats, the third metadata block containing guid is missing
     # We check if the third block can be parsed as data. If we can't we assume its a metadata block
     third_block = _initialize_empty_mapping(third_block_mapping)
