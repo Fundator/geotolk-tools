@@ -309,7 +309,7 @@ def parse_tlk_file(lines: list) -> dict:
     errors = []
     # Check for empty file (no lines)
     if not lines:
-        errors.append("No lines found")
+        errors.append("No lines found. Could not parse file")
         return {"type": "tlk", "errors": errors}
     #First, split lines into blocks/rows
     blocks = _split_tlk_to_blocks(lines)
@@ -324,7 +324,7 @@ def parse_tlk_file(lines: list) -> dict:
             row = _parse_metadata_block(block, tlk_data_mapping)
             rows.append(row)
         except Exception as e:
-            errors.append(e)
+            errors.append(str(e))
     return {"type": "tlk", "data": rows, "errors": errors}
 
 
@@ -348,7 +348,7 @@ def parse_snd_file(lines: list, min_blocks: int=3) -> dict:
     if len(blocks) < min_blocks:
         msg = f"File contains less than {min_blocks} blocks. Cannot parse"
         errors.append(msg)
-        return {"metadata": metadata, "data_blocks": [], "errors": errors}
+        return {"type": "snd", **metadata, "data_blocks": [], "errors": errors}
 
     # We know that the first block is always present for .SND files
     first_block = _parse_metadata_block(blocks[block_index], first_block_mapping)
@@ -360,7 +360,7 @@ def parse_snd_file(lines: list, min_blocks: int=3) -> dict:
     except ValueError:
         msg = f"File doesnt contain second metadatablock. Cannot parse"
         errors.append(msg)
-        return {**metadata, "data_blocks": [], "errors": errors}
+        return {"type": "snd", **metadata, "data_blocks": [], "errors": errors}
     # In some old formats, the third metadata block containing guid is missing
     # We check if the third block can be parsed as data. If we can't we assume its a metadata block
     third_block = _initialize_empty_mapping(third_block_mapping)
@@ -394,7 +394,7 @@ def parse_snd_file(lines: list, min_blocks: int=3) -> dict:
                     data = _convert_comment_codes_to_indicator_columns(data)
                     data_blocks.append({**metadata, "data": data})
             except ValueError as e:
-                errors.append(e)
+                errors.append(str(e))
 
     return {"type": "snd", **snd_metadata, "blocks": data_blocks, "errors": errors
            }
@@ -406,12 +406,10 @@ def parse_prv_file(lines: list) -> dict:
     blocks = _get_blocks(lines)
     # We know that the first block contains metadata
     metadata = _parse_metadata_block(blocks[0], prv_metadata_mapping)
-    # Add tex code as well
-    metadata["type"] = "prv"
     # If we have only one block, data is none
     if len(blocks) < 2:
         data = []
-        errors.append("PRV contains less than 2 blocks")
+        errors.append("PRV contains less than 2 blocks. Cannot parse")
     else:
         # We know that the second block contains the data
         try:
@@ -421,7 +419,7 @@ def parse_prv_file(lines: list) -> dict:
         except ValueError:
             data = []
     
-    return {"metadata": metadata, "data": data, "errors": errors}
+    return {"type": "prv", **metadata, "data": data, "errors": errors}
 
 
 _SYMBOL_LABELS_NEG = [
