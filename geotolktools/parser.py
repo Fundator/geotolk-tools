@@ -306,21 +306,26 @@ def _label_from_symbol(symbol: int) -> list:
 
 
 def parse_tlk_file(lines: list) -> dict:
+    errors = []
     # Check for empty file (no lines)
     if not lines:
-        return []
+        errors.append("No lines found")
+        return {"type": "tlk", "errors": errors}
     #First, split lines into blocks/rows
     blocks = _split_tlk_to_blocks(lines)
     #Then, go through each block and parse
     rows = []
     for block in blocks:
-        #If we have "Annet" material we need to modify the data for parsing
-        if _is_unknown_material(block):
-            block = _add_empty_value_as_material_text_1(block)
-        #Now we can parse the file according to the mapping
-        row = _parse_metadata_block(block, tlk_data_mapping)
-        rows.append(row)
-    return {"type": "tlk", "data": rows}
+        try:
+            #If we have "Annet" material we need to modify the data for parsing
+            if _is_unknown_material(block):
+                block = _add_empty_value_as_material_text_1(block)
+            #Now we can parse the file according to the mapping
+            row = _parse_metadata_block(block, tlk_data_mapping)
+            rows.append(row)
+        except Exception as e:
+            errors.append(e)
+    return {"type": "tlk", "data": rows, "errors": errors}
 
 
 def parse_snd_file(lines: list, min_blocks: int=3) -> dict:
