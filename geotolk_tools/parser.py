@@ -94,7 +94,6 @@ def _parse_unknown_data_block(block: list) -> Tuple[dict, list]:
         data = _parse_data_block(data_lines, cpt_data_mapping, _cpt_split_func)
     else:
         msg = f"Unknown survey_type {survey_type}" 
-        print(msg)
         raise ValueError(msg)
     
     return metadata, data
@@ -106,7 +105,6 @@ def _try_parse_datetime(datestr: str) -> datetime:
             return datetime.strptime(datestr, fmt)
         except ValueError:
             continue
-    print("No format matches")
     raise ValueError(f"Could not parse string as datetime {datestr}")
 
 
@@ -124,9 +122,7 @@ def _is_data_block(block: list) -> bool:
             _ = _try_parse_datetime(date)
             return True
     except Exception:
-        print("Had trouble parsing dates")
         if date.isdigit():
-            print("Someone must have modified the date, oops")
             return True
         return False
     return False
@@ -372,32 +368,35 @@ def parse_snd_file(lines: list, min_blocks: int=3) -> dict:
     data_blocks = []
     for current_block_index, block in enumerate(blocks[block_index:]):
         if _is_data_block(block):
-            metadata, data = _parse_unknown_data_block(block)
-            survey_type = metadata["survey_type_code"]
-            metadata["type"] = _SURVEY_CODE_TO_TEXT[metadata["survey_type_code"]]
+            try:
+                metadata, data = _parse_unknown_data_block(block)
+                survey_type = metadata["survey_type_code"]
+                metadata["type"] = _SURVEY_CODE_TO_TEXT[metadata["survey_type_code"]]
 
-            # If the survey type was CPT, we know that an unknown metadata file is attached at the end. We also suppose that the CPT is the last data block in the SND file, so we can finish up the file
-            if survey_type == 7:
-                try:
-                    cpt_unknown_metadata_block = blocks[block_index + current_block_index + 1]
-                    cpt_unknown_metadata = _parse_metadata_block(cpt_unknown_metadata_block, cpt_unknown_block_mapping)
-                except IndexError:
-                    cpt_unknown_metadata = _initialize_empty_mapping(cpt_unknown_block_mapping)
-                metadata = {**metadata, **cpt_unknown_metadata}
-                data_blocks.append({**metadata, "data": data})
-                break
+                # If the survey type was CPT, we know that an unknown metadata file is attached at the end. We also suppose that the CPT is the last data block in the SND file, so we can finish up the file
+                if survey_type == 7:
+                    try:
+                        cpt_unknown_metadata_block = blocks[block_index + current_block_index + 1]
+                        cpt_unknown_metadata = _parse_metadata_block(cpt_unknown_metadata_block, cpt_unknown_block_mapping)
+                    except IndexError:
+                        cpt_unknown_metadata = _initialize_empty_mapping(cpt_unknown_block_mapping)
+                    metadata = {**metadata, **cpt_unknown_metadata}
+                    data_blocks.append({**metadata, "data": data})
+                    break
 
-            # For tot-files, we need to convert the comment codes to indicator columns
-            elif survey_type == 25:
-                data = _convert_comment_codes_to_indicator_columns(data)
-                data_blocks.append({**metadata, "data": data})
-
+                # For tot-files, we need to convert the comment codes to indicator columns
+                elif survey_type == 25:
+                    data = _convert_comment_codes_to_indicator_columns(data)
+                    data_blocks.append({**metadata, "data": data})
+            except ValueError as e:
+                errors.append(e)
 
     return {"type": "snd", **snd_metadata, "blocks": data_blocks, "errors": errors
            }
 
 
 def parse_prv_file(lines: list) -> dict:
+    errors = []
     # First split lines into blocks
     blocks = _get_blocks(lines)
     # We know that the first block contains metadata
@@ -407,7 +406,7 @@ def parse_prv_file(lines: list) -> dict:
     # If we have only one block, data is none
     if len(blocks) < 2:
         data = []
-        print("PRV contains less than 2 blocks")
+        errors.append("PRV contains less than 2 blocks")
     else:
         # We know that the second block contains the data
         try:
@@ -417,7 +416,7 @@ def parse_prv_file(lines: list) -> dict:
         except ValueError:
             data = []
     
-    return {"metadata": metadata, "data": data}
+    return {"metadata": metadata, "data": data, "errors": errors}
 
 
 _SYMBOL_LABELS_NEG = [
