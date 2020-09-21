@@ -211,7 +211,7 @@ def _get_blocks(lines: list) -> list:
 
 def _modify_indicator_by_code(code: int, indicators: dict) -> dict:
     if code in geosuite_code_to_label.keys():
-        indicators["comment_label"].append(geosuite_code_to_label[code])
+        indicators["comment_label"].append(code)
     elif code == 70:
         indicators["okt_rotasjon"] = 1
     elif code == 71:
