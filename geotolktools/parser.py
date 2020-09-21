@@ -237,6 +237,11 @@ def _modify_indicator_by_code(code: int, indicators: dict) -> dict:
     
     return indicators
 
+def merge_comments_to_single_label(comment_label: List[str]) -> int:
+    # For now, return the highest code
+    return max(comment_label)
+
+
 
 def _convert_comment_codes_to_indicator_columns(parsed_snd_block: list) -> dict:
     # Go through the rows of the datablock
@@ -266,7 +271,7 @@ def _convert_comment_codes_to_indicator_columns(parsed_snd_block: list) -> dict:
                     # If it is, then do actions based on the code
                     indicators = _modify_indicator_by_code(int(code), indicators)
         if indicators["comment_label"]:
-            indicators["comment_label"] = " ".join(indicators["comment_label"])
+            indicators["comment_label"] = merge_comments_to_single_label(indicators["comment_label"])
         else:
             indicators["comment_label"] = np.nan
         row = {**row, **indicators}

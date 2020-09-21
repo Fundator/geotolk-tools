@@ -2,8 +2,9 @@ from collections import defaultdict
 import sys
 import os
 import re
-from typing import List
+from typing import List, Tuple
 from .parser import parse_snd_file, parse_tlk_file, parse_prv_file, path_to_lines
+import pandas as pd
 
 _VALID_FILETYPES = [".snd", ".tlk", ".prv"]
 _PR_PATTERN = re.compile(".*PR([^\-]).*(SND|snd)")
@@ -100,3 +101,37 @@ def load_folder(folder_path: str) -> dict:
         folder_data[uid].append(parsed)
     return folder_data
 
+
+def _convert_to_df_and_add_id(data: List[dict], _id: str) -> pd.DataFrame:
+    df = pd.DataFrame(data)
+    df["borehole_id"] = _id
+    return df
+
+
+def get_data_from_filedict(file_dict: dict) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    tot, cpt, tlk, prv = [],[],[],[]
+    for _id, borehole in file_dict.items():
+        for item in borehole:
+            filetype = item["type"]
+            if filetype == "snd":
+                block_key = "blocks"
+                blocks = item[block_key]
+                for block in blocks:
+                    blocktype = block["type"]
+                    if blocktype == "tot" and block["data"]:
+                        tot.append((block["data"], _id))
+                    elif blocktype == "cpt" and block["data"]:
+                        cpt.append((block["data"], _id))
+
+            elif filetype == "prv":
+                if block["data"]:
+                    prv.append((block["data"], _id))
+            elif filetype == "tlk":
+                if block["data"]:
+                    tlk.append((block["data"], _id))
+
+    tot = pd.concat([_convert_to_df_and_add_id(df, _id) for (df, _id) in tot])
+    cpt = pd.concat([_convert_to_df_and_add_id(df, _id) for (df, _id) in cpt])
+    tlk = pd.concat([_convert_to_df_and_add_id(df, _id) for (df, _id) in tlk])
+    prv = pd.concat([_convert_to_df_and_add_id(df, _id) for (df, _id) in prv])
+    return tot, cpt, tlk, prv
