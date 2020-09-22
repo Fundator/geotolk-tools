@@ -3,53 +3,54 @@ import pandas as pd
 import numpy as np
 from scipy.stats import trim_mean, median_absolute_deviation
 from scipy.interpolate import interp1d
+import scipy.special as sc
+import warnings
+from typing import List, Tuple
+from .mappings import VALID_RANGES_TOT
 
-def bortid(df: pd.DataFrame) -> pd.Series:
-    """
-    Compute "bortid" for the given total sounding
-    :param df: Input total sounding
-    :type df: pd.DataFrame
-    :return: Bortid
-    :rtype: pd.Series
-    """
-    return (df["sek10"] / 10) / df["depth"].diff().fillna(method="bfill")
+warnings.simplefilter("ignore", RuntimeWarning)
 
+_INDICATOR_COLUMNS = ["okt_rotasjon", "spyling", "slag", "pumping"]
+_ID_COL = "borehole_id"
+_LABEL_COL = "comment_label"
+_CATEGORICAL_COLS = {"okt_rotasjon", "spyling", "slag", "pumping", "comment_label"}
+_FLOAT_COLS = {"trykk", "spyle", "sek10"}
+_MIN_ROWS_TOT = 5
+_MAX_GAP = 2.5
 
-def standardize_depth(df: pd.DataFrame, depth_delta: float=0.04) -> pd.DataFrame:
-    """e the values of 'df' so that the depth-axis has the specified resolution.
-
-    :param df:
-    InterpolatInput total sounding
-    :type df: pd.DataFrame
-    :param depth_delta: New depth-resolution (in meters)
-    :type depth_delta: float
-    :return: Interpolated total sounding
-    :rtype: pd.DataFrame.
-    """
-    if (df["depth"].diff().dropna() == depth_delta).all():
+def _standardize_depth(df: pd.DataFrame, float_cols: set=_FLOAT_COLS, categorical_cols: set=_CATEGORICAL_COLS,  depth_delta: float=0.04, depth_colname: str="dybde", comment_colname: str="kommentar") -> pd.DataFrame:
+    # Sjekk om dybden allerede er korrekt
+    if (df[depth_colname].diff().dropna() == depth_delta).all():
         return df
 
+    # Lag ny kolonne med korrekt intervall
     out = pd.DataFrame(columns=df.columns)
-    new_depth = np.arange(df["depth"].min(), df["depth"].max() + depth_delta, depth_delta)
+    new_depth = np.arange(df[depth_colname].min(), df[depth_colname].max() + depth_delta, depth_delta)
 
-    assert len(new_depth) > 1
+    if len(new_depth) <= 1: 
+        raise ValueError("File only contains one depth, can't standardize depth")
     assert np.allclose(np.diff(new_depth), depth_delta, atol=1E-6)
-    out.loc[:, "depth"] = new_depth
+    out.loc[:, depth_colname] = new_depth
 
-    float_cols = {"pressure", "sek10", "spyletrykk", "bortid"}
-    _interpolate("depth", float_cols, out, df, "linear")
+    _interpolate(depth_colname, float_cols, out, df, "linear")
 
-    categorical_cols = {"spyling", "okt_rotasjon", "slag", "label"}
-    _interpolate("depth", categorical_cols, out, df, "nearest")
+    _interpolate(depth_colname, categorical_cols, out, df, "nearest")
 
-    if "merknad" in df.columns:
-        remarks = df[["depth", "merknad"]].dropna(subset=["merknad"], axis=0)
+    # Do not extrapolate last row
+    max_depth = out.iloc[-1][depth_colname]
+    idx = out.iloc[-1].name
+    out.iloc[idx, :] = df.iloc[-1].copy()
+    out.loc[idx, depth_colname] = max_depth
+    """
+    if comment_colname in df.columns:
+        remarks = df[[depth_colname, comment_colname]].dropna(subset=[comment_colname], axis=0)
         if not remarks.empty:
-            inds = np.searchsorted(new_depth, remarks["depth"])
+            inds = np.searchsorted(new_depth, remarks[depth_colname])
             inds[inds == out.shape[0]] = -1
-            out.loc[inds, "merknad"] = remarks["merknad"].values
+            out.loc[inds, comment_colname] = remarks[comment_colname].values
 
-    constant_cols = list(set(df.columns) - (float_cols | categorical_cols | {"depth", "merknad"}))
+    """
+    constant_cols = list(set(df.columns) - (float_cols | categorical_cols | {depth_colname, comment_colname}))
     for col in constant_cols:
         out.loc[:, col] = df[col].iloc[0]
 
@@ -66,109 +67,85 @@ def _interpolate(x_col, y_cols, new, old, kind):
     new.loc[:, interp_cols] = interpolated
 
 
-def preprocess(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Compute the smoothed differentiated pressure, and its rolling standard deviation, which can be used in the synthetic
-    labeling process.
+def _has_less_than_n_rows(df: pd.DataFrame, nrows: int) -> bool:
+    return df.shape[0] < nrows
 
-    :param df: Input total sounding
-    :type df: pd.DataFrame
-    :return: Dataframe containing diff'd, smoothed, and std'd pressure
-    :rtype: pd.DataFrame
-    """
-    df["bortid"] = bortid(df)
-    diff_pressure = df["pressure"].diff().bfill()
-    window_length = 20
-    smoother = lambda x: trim_mean(x, proportiontocut=0.3)
-
-    df["smoothed_diff_pressure"] = diff_pressure.rolling(window_length, center=True, min_periods=1).apply(smoother, raw=True)
-    df["pressure_std"] = df["smoothed_diff_pressure"].rolling(2 * window_length, center=True, min_periods=1).std()
-    return df
+def _fill_indicator_cols(df: pd.DataFrame, indicator_columns: List[str]) -> pd.DataFrame:
+    return df[indicator_columns].ffill().fillna(0)        
 
 
-def apply_parallel(df_grouped, func):
-    """
-    Pandas groupby.apply in parallel.
-
-    :param df_grouped: Grouped dataframe (result of df.groupby(...))
-    :type df_grouped: pd.GroupBy
-    :param func: function to apply to grouped dataframes
-    :type func: function
-    :return: Resulting dataframe
-    :rtype: pd.DataFrame
-    """
-    n_cores = multiprocessing.cpu_count()
-    with multiprocessing.Pool(np.maximum(1, n_cores-1)) as p:
-        ret_list = p.map(func, [group for name, group in df_grouped])
-    return pd.concat(ret_list)
+def _fill_label_col(df: pd.DataFrame, label_column: str) -> pd.DataFrame:
+        return df[label_column].ffill()    
 
 
-def preprocess_total_sounding(df: pd.DataFrame, multiprocessing: bool=True) -> pd.DataFrame:
-    """Applies preprocessing functions to the data
+def _correct_values(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
+    _df = df.copy()
+    for column_name in mapping:
+        if column_name not in _df.columns:
+            raise KeyError(f"Coulumn {column_name} not found in data")
+        _df[column_name] = np.clip(_df[column_name], mapping[column_name]["min"], mapping[column_name]["max"])
+    return _df
+
+
+def _remove_huge_depth_gaps(df: pd.DataFrame, threshold: float) -> Tuple[pd.DataFrame, List[dict]]:
+    _df = df.copy()
+    # get difference between rows
+    error = ""
+    diff = _df["dybde"].diff().dropna()
+    above_thresh = diff[np.abs(diff) > threshold]
+    if len(above_thresh.index) != 0:
+
+        error = f"Detected gap of {above_thresh.max()} above threshold of {threshold}. "
+        gap_idx = above_thresh.index[0]
+        start_idx = _df.iloc[0].name
+        stop_idx = _df.iloc[-1].name
+
+        n_above = gap_idx - start_idx
+        n_below = stop_idx - gap_idx
+
+        # If the amount of rows above gap is more than below, select from the start of the file to the gap
+        if n_above > n_below:
+            error += f"Removing the last {n_below +1} rows after gap"
+            _df =  _df.iloc[start_idx:gap_idx]
+        # Otherwise, return from the gap to the end of the file
+        else:
+            error += f"Removing the first {n_above +1} rows before gap"
+            _df = _df.iloc[gap_idx:stop_idx]
+    return _df, error
+
+
+def preprocess(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[dict]]:
+    """Preprocesses a total sounding dataframe. df may be a single sounding file or a collection of many tot-files
 
     Args:
-        df (pd.DataFrame): Data to be preprocessed
-        multiprocessing (bool, optional): If multiprocessing is to be used. Defaults to True.
+        df (pd.DataFrame): Dataframe with total soundings
 
     Returns:
-        pd.DataFrame: Preprocessed dataframe
+        Tuple[pd.DataFrame, List[dict]]: (<processed_dataframe>, List of errors occured during preprocessing)
     """
-    if multiprocessing:
-        df = apply_parallel(df.groupby("id", group_keys=False), standardize_depth)
-        df.reset_index(drop=True, inplace=True)
-        df = apply_parallel(df.groupby("id", group_keys=False), preprocess)
-    else:
-        df = standardize_depth(df).reset_index(drop=True)
-        df = preprocess(df)
+    _df = df.copy()
+    errors = []
+    groups = []
+    # Group by id-column
+    for name, group in _df.groupby(_ID_COL):
+        # Check if it has less than n_rows:
+        if not _has_less_than_n_rows(group, _MIN_ROWS_TOT):
+            # Remove huge gaps
+            group, error = _remove_huge_depth_gaps(group, _MAX_GAP)
+            if error:
+                errors.append({"filename": name, "error": error})
+            # Fill indicator_columns
+            group[_INDICATOR_COLUMNS] = _fill_indicator_cols(group, _INDICATOR_COLUMNS)
+            # Fill label column
+            group[_LABEL_COL] = _fill_label_col(group, _LABEL_COL)
+            # Clip values
+            group = _correct_values(group, VALID_RANGES_TOT)
 
-    return df
-
-def extract_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Extract temporal features from a total sounding dataframe. The features are rolling median/std for continuous
-    features, and rolling sums for binary features.
-
-    :param df: Input total sounding
-    :type df: pd.DataFrame
-    :return: Extracted features
-    :rtype: pd.DataFrame
-    """
-    features = pd.DataFrame(index=df.index)
-    window_lengths = [10, 50, 100]
-    cont_features = ["pressure", "sek10", "spyletrykk", "bortid"]
-    cat_features = ["okt_rotasjon", "spyling", "slag"]
-
-    for l in window_lengths:
-        for col in cont_features:
-            features["{}_rolling_median_{}".format(col, l)] = df[col].rolling(l, center=True, min_periods=1).median()
-            features["{}_rolling_median_absolute_deviation_{}".format(col, l)] = df[col].rolling(l, center=True,
-                                                                                                 min_periods=1).apply(
-                lambda row: median_absolute_deviation(row))
-            features["{}_rolling_sum_{}".format(col, l)] = df[col].rolling(l, center=True, min_periods=1).apply(
-                lambda row: sum(row))
-        for col in cat_features:
-            features["{}_rolling_sum_{}".format(col, l)] = df[col].rolling(l, center=True, min_periods=1).sum()
-
-    features["pressure_diff"] = df["pressure"].rolling(3, center=True, min_periods=1).median().diff().bfill()
-
-    return features
-
-
-def extract_features_total_sounding(df: pd.DataFrame, multiprocessing: bool=True) -> pd.DataFrame:
-    """
-    Extract features for the given preprocessed total sounding
-    :param df: Input preprocessed total sounding
-    :type df: pd.DataFrame
-    :return: Extracted features,
-    :rtype: df: pd.DataFrame
-    """
-
-    features = df[["depth", "pressure", "sek10", "spyletrykk", "spyling", "okt_rotasjon", "slag"]]
-
-    if multiprocessing:
-        rolling_features = apply_parallel(df.groupby("id", group_keys=False), extract_features)
-    else:
-        rolling_features = extract_features(df)
-
-    features = pd.concat([features, rolling_features], axis=1)
-    return features
+            # Standardize depth
+            try:
+                groups.append(_standardize_depth(group))
+            except ValueError as e:
+                errors.append({"filename": name, "error": e})
+        else:
+            errors.append({"filename": name, "error": f"Skipped as it has less than {_MIN_ROWS_TOT} rows"})
+    return pd.concat(groups), errors

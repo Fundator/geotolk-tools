@@ -73,6 +73,14 @@ _FILEPARSER = {
 }
 
 def load_folder(folder_path: str) -> dict:
+    """Loads all valid files from the given folder path
+
+    Args:
+        folder_path (str): Path to the folder with the files. Usually this is the AUTOGRAF.DBF-folder
+
+    Returns:
+        dict: File dict containing all the metadata and data of the valid files in the folder
+    """
     # Find all filenams in the folder
     filenames = _find_filenames_in_folder(folder_path)
 
@@ -109,7 +117,18 @@ def _convert_to_df_and_add_id(data: List[dict], _id: str) -> pd.DataFrame:
 
 
 def get_data_from_filedict(file_dict: dict) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-    tot, cpt, tlk, prv = [],[],[],[]
+    """Orders the different survey types into dataframes
+
+    Args:
+        file_dict (dict): file_dict containing metadata and data
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]: returns (tot, cpt, tlk, prv)
+    """
+    tot = []
+    cpt = []
+    tlk = []
+    prv = []
     for _id, borehole in file_dict.items():
         for item in borehole:
             filetype = item["type"]
@@ -124,14 +143,19 @@ def get_data_from_filedict(file_dict: dict) -> Tuple[pd.DataFrame, pd.DataFrame,
                         cpt.append((block["data"], _id))
 
             elif filetype == "prv":
-                if block["data"]:
-                    prv.append((block["data"], _id))
+                if "data" in item and item["data"]:
+                    prv.append((item["data"], _id))
             elif filetype == "tlk":
-                if block["data"]:
-                    tlk.append((block["data"], _id))
+                if "data" in item and item["data"]:
+                    tlk.append((item["data"], _id))
 
-    tot = pd.concat([_convert_to_df_and_add_id(df, _id) for (df, _id) in tot])
-    cpt = pd.concat([_convert_to_df_and_add_id(df, _id) for (df, _id) in cpt])
-    tlk = pd.concat([_convert_to_df_and_add_id(df, _id) for (df, _id) in tlk])
-    prv = pd.concat([_convert_to_df_and_add_id(df, _id) for (df, _id) in prv])
+    tot_list = [_convert_to_df_and_add_id(df, _id) for (df, _id) in tot]
+    cpt_list = [_convert_to_df_and_add_id(df, _id) for (df, _id) in cpt]
+    tlk_list = [_convert_to_df_and_add_id(df, _id) for (df, _id) in tlk]
+    prv_list = [_convert_to_df_and_add_id(df, _id) for (df, _id) in prv]
+
+    tot = pd.concat(tot_list) if tot_list else None
+    cpt = pd.concat(cpt_list) if cpt_list else None
+    tlk = pd.concat(tlk_list) if tlk_list else None
+    prv = pd.concat(prv_list) if prv_list else None
     return tot, cpt, tlk, prv
