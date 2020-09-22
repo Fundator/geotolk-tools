@@ -2,6 +2,15 @@ from datetime import datetime
 import numpy as np
 
 
+# Waiting to fill these after feedback from geotechnicians
+VALID_RANGES_TOT = {
+    "dybde": {"min": 0, "max": np.inf},
+    "trykk": {"min": -np.inf, "max": np.inf},
+    "spyle": {"min": 0, "max": np.inf},
+    "sek10": {"min": 0, "max": np.inf},
+}
+
+
 first_block_mapping = {
     "x": {"index": 0, "dtype": float},
     "y": {"index": 1, "dtype": float},
@@ -190,7 +199,7 @@ geosuite_code_to_label = {
     38: "gytje",
     40: "stein_blokk",
     41: "stein_gjennomboring",
-    42: "sluttnivå stein",
+    42: "sluttnivaa_stein",
     43: "fjell",
     60: "boyd_borstang",
     61: "antatt_grunnvannskote",

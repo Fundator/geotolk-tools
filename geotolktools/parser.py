@@ -189,6 +189,14 @@ def _split_tlk_to_blocks(lines: list) -> list:
 
 
 def path_to_lines(path: str) -> List[str]:
+    """Opens, and converts the file located in path to a list of lines in the file
+
+    Args:
+        path (str): absolute path to the file
+
+    Returns:
+        List[str]: List where each element is a line in the file
+    """
     with open(path, "r") as f:
         lines = f.readlines()
     lines = [l.replace("\n", "") for l in lines]
@@ -237,7 +245,7 @@ def _modify_indicator_by_code(code: int, indicators: dict) -> dict:
     
     return indicators
 
-def merge_comments_to_single_label(comment_label: List[str]) -> int:
+def _merge_comments_to_single_label(comment_label: List[str]) -> int:
     # For now, return the highest code
     return max(comment_label)
 
@@ -271,7 +279,7 @@ def _convert_comment_codes_to_indicator_columns(parsed_snd_block: list) -> dict:
                     # If it is, then do actions based on the code
                     indicators = _modify_indicator_by_code(int(code), indicators)
         if indicators["comment_label"]:
-            indicators["comment_label"] = merge_comments_to_single_label(indicators["comment_label"])
+            indicators["comment_label"] = _merge_comments_to_single_label(indicators["comment_label"])
         else:
             indicators["comment_label"] = np.nan
         row = {**row, **indicators}
@@ -310,12 +318,20 @@ def _label_from_symbol(symbol: int) -> list:
     return label or []
 
 
-def parse_tlk_file(lines: list) -> dict:
+def parse_tlk_file(lines: List[str]) -> dict:
+    """Parses tlk-files
+
+    Args:
+        lines (List[str]): List of lines in the tlk file
+
+    Returns:
+        dict: data contained in the tlk-file
+    """
     errors = []
     # Check for empty file (no lines)
     if not lines:
         errors.append("No lines found. Could not parse file")
-        return {"type": "tlk", "errors": errors}
+        return {"type": "tlk", "data": [], "errors": errors}
     #First, split lines into blocks/rows
     blocks = _split_tlk_to_blocks(lines)
     #Then, go through each block and parse
@@ -333,7 +349,16 @@ def parse_tlk_file(lines: list) -> dict:
     return {"type": "tlk", "data": rows, "errors": errors}
 
 
-def parse_snd_file(lines: list, min_blocks: int=3) -> dict:
+def parse_snd_file(lines: List[str], min_blocks: int=3) -> dict:
+    """Parses a snd file. These files may contain up to one tot-file and/or up to one cpt-file
+
+    Args:
+        lines (List[str]): snd-files as a list of lines
+        min_blocks (int, optional): Minimum number of blocks in file, otherwise it gets discarded. Defaults to 3.
+
+    Returns:
+        dict: dictionary containing metadata and data from the snd file
+    """
     # Initialize list of errors
     errors = []
 
@@ -405,7 +430,15 @@ def parse_snd_file(lines: list, min_blocks: int=3) -> dict:
            }
 
 
-def parse_prv_file(lines: list) -> dict:
+def parse_prv_file(lines: List[str]) -> dict:
+    """Parses a prv file
+
+    Args:
+        lines (list): prv file as lines
+
+    Returns:
+        dict: dictionary with data and metadata from the prv file
+    """
     errors = []
     # First split lines into blocks
     blocks = _get_blocks(lines)
