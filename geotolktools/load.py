@@ -42,9 +42,6 @@ def _remove_CPTU_files(files: List[str]) -> List[str]:
     return [f for f in files if "cptu" not in f.lower()]
 
 
-def _get_oppdragsnr(oppdragsnr: str) -> int:
-    return int(oppdragsnr.split("_")[-1])
-
 def _sanitize_filename(filename: str) -> str:
     # First remove file ending
     prefix = filename[:-4]
@@ -61,8 +58,7 @@ def _sanitize_filename(filename: str) -> str:
 def _create_id(path: str) -> dict:
     split_str = path.split(_SEPARATOR)
     filename = split_str[-1]
-    oppdragsnr_raw = split_str[-3]
-    oppdragsnr = _get_oppdragsnr(oppdragsnr_raw)
+    oppdragsnr = split_str[-3]
     borehole_id = _sanitize_filename(filename)
     return {"oppdragsnr": oppdragsnr, "borehole_id": borehole_id, "filename": filename}
 
