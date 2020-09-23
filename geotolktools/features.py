@@ -55,7 +55,7 @@ def _get_smoothed_diff_pressure_std(df: pd.DataFrame) -> pd.DataFrame:
     df["pressure_std"] = df["smoothed_diff_pressure"].rolling(2 * window_length, center=True, min_periods=1).std()
     return df
 
-def _extract_rolling_features(df: pd.DataFrame) -> pd.DataFrame:
+def _extract_features(df: pd.DataFrame) -> pd.DataFrame:
     """
     Extract temporal features from a total sounding dataframe. The features are rolling median/std for continuous
     features, and rolling sums for binary features.
@@ -64,22 +64,23 @@ def _extract_rolling_features(df: pd.DataFrame) -> pd.DataFrame:
     :return: Extracted features
     :rtype: pd.DataFrame
     """
-    features = pd.DataFrame(index=df.index)
+    df = _get_smoothed_diff_pressure_std(df)
+
     window_lengths = [10, 50, 100]
     cont_features = [_PRESSURE_COLNAME, "sek10", _FLUSH_COLNAME, "bortid"]
     cat_features = ["okt_rotasjon", "spyling", "slag", "pumping"]
 
     for l in window_lengths:
         for col in cont_features:
-            features[f"{col}_rolling_median_{l}"] = df[col].rolling(l, center=True, min_periods=1).median()
-            features[f"{col}_rolling_median_absolute_deviation_{l}"] = df[col].rolling(l, center=True, min_periods=1).apply(lambda row: median_absolute_deviation(row))
-            features[f"{col}_rolling_sum_{l}"] = df[col].rolling(l, center=True, min_periods=1).apply(lambda row: sum(row))
+            df[f"{col}_rolling_median_{l}"] = df[col].rolling(l, center=True, min_periods=1).median()
+            df[f"{col}_rolling_median_absolute_deviation_{l}"] = df[col].rolling(l, center=True, min_periods=1).apply(lambda row: median_absolute_deviation(row))
+            df[f"{col}_rolling_sum_{l}"] = df[col].rolling(l, center=True, min_periods=1).apply(lambda row: sum(row))
         for col in cat_features:
-            features[f"{col}_rolling_sum_{l}"] = df[col].rolling(l, center=True, min_periods=1).sum()
+            df[f"{col}_rolling_sum_{l}"] = df[col].rolling(l, center=True, min_periods=1).sum()
 
-    features["pressure_diff"] = df[_PRESSURE_COLNAME].rolling(3, center=True, min_periods=1).median().diff().bfill()
+    df["pressure_diff"] = df[_PRESSURE_COLNAME].rolling(3, center=True, min_periods=1).median().diff().bfill()
 
-    return features
+    return df
 
 
 def extract_features_tot(df: pd.DataFrame, multiprocessing: bool=True) -> pd.DataFrame:
@@ -93,13 +94,8 @@ def extract_features_tot(df: pd.DataFrame, multiprocessing: bool=True) -> pd.Dat
 
 
     if multiprocessing:
-        df = _apply_parallel(df.groupby(_ID_COLNAME, group_keys=False), _get_smoothed_diff_pressure_std)
-        rolling_features = _apply_parallel(df.groupby(_ID_COLNAME, group_keys=False), _extract_rolling_features)
+        df = _apply_parallel(df.groupby(_ID_COLNAME, group_keys=False), _extract_features)
     else:
-        df = df.groupby(_ID_COLNAME).apply(_get_smoothed_diff_pressure_std)
-        rolling_features = df.groupby(_ID_COLNAME).apply(_extract_rolling_features)
+        df = df.groupby(_ID_COLNAME).apply(_extract_features)
 
-    features = df
-    features = pd.concat([features, rolling_features], axis=1)
-    features [_ID_COLNAME] = df[_ID_COLNAME]
-    return features
+    return df
