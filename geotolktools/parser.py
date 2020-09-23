@@ -19,6 +19,26 @@ _DATETIME_FMTS = [
 ]
 
 
+_CODES = {
+    "": 0,
+    "berg": 1,
+    "BelBl": 40,
+    "block": 2,
+    "friktjord": 36,
+    "fyllning": 13,
+    "grus": 32,
+    "gyttja": 8,
+    "mylla": 19,
+    "kvicklera": 34,
+    "lera": 11,
+    "moraen": 35,
+    "sand": 20,
+    "silt": 21,
+    "sten": 39,
+    "torrskorpa": 33,
+    "torv": 27,
+}
+
 def _parse_metadata_block(block: list, mapping: dict) -> dict:
     block_parsed = {}
     for key1, value1 in mapping.items():
@@ -343,6 +363,8 @@ def parse_tlk_file(lines: List[str]) -> dict:
                 block = _add_empty_value_as_material_text_1(block)
             #Now we can parse the file according to the mapping
             row = _parse_metadata_block(block, tlk_data_mapping)
+            # If we dont have a value for material_code, check if we can get one from material
+            row["material_code"] = row["material_code"] if not np.isnan(row["material_code"]) else _CODES.get(row["material"], 0)
             rows.append(row)
         except Exception as e:
             errors.append(str(e))

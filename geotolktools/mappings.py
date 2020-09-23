@@ -86,7 +86,7 @@ cpt_data_mapping = {
 tlk_data_mapping = {
     "line1": {
         "index": 0, "nested": {
-            "material": {"index": 0, "dtype": lambda x: str(x) if x != "None" else np.nan},
+            "material": {"index": 0, "dtype": lambda x: str(x) if x != "None" else 0},
             "material_code": {"index": 1, "dtype": int},
             "vurdering": {"index": 2, "dtype": int},
             "klassifisering": {"index": 3, "dtype": int},
