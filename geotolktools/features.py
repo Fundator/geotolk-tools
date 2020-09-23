@@ -99,7 +99,7 @@ def extract_features_tot(df: pd.DataFrame, multiprocessing: bool=True) -> pd.Dat
         df = df.groupby(_ID_COLNAME).apply(_get_smoothed_diff_pressure_std)
         rolling_features = df.groupby(_ID_COLNAME).apply(_extract_rolling_features)
 
-    features = df[_FEATURES]
+    features = df
     features = pd.concat([features, rolling_features], axis=1)
     features [_ID_COLNAME] = df[_ID_COLNAME]
     return features

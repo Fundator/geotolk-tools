@@ -148,4 +148,7 @@ def preprocess(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[dict]]:
                 errors.append({"filename": name, "error": e})
         else:
             errors.append({"filename": name, "error": f"Skipped as it has less than {_MIN_ROWS_TOT} rows"})
-    return pd.concat(groups), errors
+    
+    out = pd.concat(groups)
+    out.reset_index(inplace=True)
+    return out, errors
