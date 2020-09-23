@@ -4,7 +4,7 @@ from .mappings import *
 from uuid import uuid4
 
 _KNOWN_SURVEY_CODES = [7, 10, 21, 22,  23, 24,  25, 26]
-
+_MIN_ROWS_TOT = 10
 _SURVEY_CODE_TO_TEXT = {
     25: "tot",
     7: "cpt"
@@ -116,6 +116,10 @@ def _parse_unknown_data_block(block: list) -> Tuple[dict, list]:
         msg = f"Unknown survey_type {survey_type}" 
         raise ValueError(msg)
     
+    if not data:
+        msg = f"No data found"
+        raise ValueError(msg)
+
     return metadata, data
 
 
@@ -388,7 +392,6 @@ def parse_snd_file(lines: List[str], min_blocks: int=3) -> dict:
     block_index = 0
     # first, split the lines into blocks
     blocks = _get_blocks(lines)
-
     # Initialize empty metadata
     metadata ={
             **_initialize_empty_mapping(first_block_mapping),
@@ -429,28 +432,45 @@ def parse_snd_file(lines: List[str], min_blocks: int=3) -> dict:
                 metadata, data = _parse_unknown_data_block(block)
                 survey_type = metadata["survey_type_code"]
                 metadata["type"] = _SURVEY_CODE_TO_TEXT[metadata["survey_type_code"]]
+                if _is_valid_data(data, survey_type):
+                    # If the survey type was CPT, we know that an unknown metadata file is attached at the end. We also suppose that the CPT is the last data block in the SND file, so we can finish up the file
+                    if survey_type == 7:
+                        try:
+                            cpt_unknown_metadata_block = blocks[block_index + current_block_index + 1]
+                            cpt_unknown_metadata = _parse_metadata_block(cpt_unknown_metadata_block, cpt_unknown_block_mapping)
+                        except IndexError:
+                            cpt_unknown_metadata = _initialize_empty_mapping(cpt_unknown_block_mapping)
+                        metadata = {**metadata, **cpt_unknown_metadata}
+                        data_blocks.append({**metadata, "data": data})
+                        break
 
-                # If the survey type was CPT, we know that an unknown metadata file is attached at the end. We also suppose that the CPT is the last data block in the SND file, so we can finish up the file
-                if survey_type == 7:
-                    try:
-                        cpt_unknown_metadata_block = blocks[block_index + current_block_index + 1]
-                        cpt_unknown_metadata = _parse_metadata_block(cpt_unknown_metadata_block, cpt_unknown_block_mapping)
-                    except IndexError:
-                        cpt_unknown_metadata = _initialize_empty_mapping(cpt_unknown_block_mapping)
-                    metadata = {**metadata, **cpt_unknown_metadata}
-                    data_blocks.append({**metadata, "data": data})
-                    break
-
-                # For tot-files, we need to convert the comment codes to indicator columns
-                elif survey_type == 25:
-                    data = _convert_comment_codes_to_indicator_columns(data)
-                    data_blocks.append({**metadata, "data": data})
+                    # For tot-files, we need to convert the comment codes to indicator columns
+                    elif survey_type == 25:
+                        data = _convert_comment_codes_to_indicator_columns(data)
+                        data_blocks.append({**metadata, "data": data})
+                else:
+                    errors.append(f"File contains {len(data)} lines, must contain {_MIN_ROWS_TOT} to be able to be parsed")
+                    data_blocks.append({**metadata, "data": []})
             except ValueError as e:
                 errors.append(str(e))
-
+        else:
+            msg = "One or more of the data blocks is not valid"
+            errors.append(msg)
     return {"type": "snd", **snd_metadata, "blocks": data_blocks, "errors": errors
            }
 
+
+def _is_valid_data(data: dict, filetype:str) -> bool:
+    if filetype == 25:
+        # If the number of rows is less than a threshold, return false
+        if len(data) < _MIN_ROWS_TOT:
+            return False    
+    elif filetype == 7:
+        pass
+    else:
+        raise ValueError(f"Unknown filetype {filetype}")
+
+    return True
 
 def parse_prv_file(lines: List[str]) -> dict:
     """Parses a prv file

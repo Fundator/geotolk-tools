@@ -86,7 +86,7 @@ cpt_data_mapping = {
 tlk_data_mapping = {
     "line1": {
         "index": 0, "nested": {
-            "material": {"index": 0, "dtype": lambda x: str(x) if x != "None" else 0},
+            "material": {"index": 0, "dtype": lambda x: str(x) if x != "None" else np.nan},
             "material_code": {"index": 1, "dtype": int},
             "vurdering": {"index": 2, "dtype": int},
             "klassifisering": {"index": 3, "dtype": int},
@@ -141,7 +141,7 @@ prv_metadata_mapping = {
 
 
 prv_data_mapping = {
-    "prove_nr": {"index": 0, "dtype": lambda x: int(x) if x.isdigit() else np.nan},
+    "prove_nr": {"index": 0, "dtype": str},
     "symbol": {"index": 1, "dtype": int},
     "dybde": {"index": 2, "dtype": float},
     "w": {"index": 3, "dtype": float},
