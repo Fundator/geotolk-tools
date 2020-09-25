@@ -8,7 +8,34 @@ from azure.cosmosdb.table.tablebatch import TableBatch
 
 logger = logging.getLogger(__name__)
 
-def upload_batches_to_database(data, table, connection_string):
+def batch_upload_data_to_table_storage(data, table, connection_string):
+    """
+    Upload a list of dictionaries to Azure TableStorage
+    
+    :param data: A list of dictionaries containing data. All rows must contain the fields PartitionKey and RowKey
+    :type data: list of dict
+    :param table: The name of the table where the data will be inserted
+    :type table: str
+    :return: Number of uploaded rows
+    :rtype: int
+    """
+    # Batch insertion in Azure requires all data in one batch to have the same PartitionKey
+    sorted_data = {}
+    uploaded = 0
+
+    for row_entity in data:
+        partitionKey = row_entity["PartitionKey"]
+        if partitionKey not in sorted_data.keys():
+            sorted_data[partitionKey] = []
+        sorted_data[partitionKey].append(row_entity)
+    
+    for partitionKey in sorted_data.keys():
+        _upload_batches_to_database(sorted_data[partitionKey], table, connection_string)
+        uploaded += len(sorted_data[partitionKey])
+
+    return uploaded
+
+def _upload_batches_to_database(data, table, connection_string):
     """
     Upload data with the same PartitionKey in batches of up to 100 entities
 
@@ -28,27 +55,6 @@ def upload_batches_to_database(data, table, connection_string):
 
     table_service.commit_batch(table, batch)
 
-def batch_upload_data_to_table_storage(data, table, connection_string):
-    """
-    Upload a list of dictionaries to Azure TableStorage
-    
-    :param data: A list of dictionaries containing data. All rows must contain the fields PartitionKey and RowKey
-    :type data: list of dict
-    :param table: The name of the table where the data will be inserted
-    :type table: str
-    """
-    # Batch insertion in Azure requires all data in one batch to have the same PartitionKey
-    sorted_data = {}
-
-    for row_entity in data:
-        partitionKey = row_entity["PartitionKey"]
-        if partitionKey not in sorted_data.keys():
-            sorted_data[partitionKey] = []
-        sorted_data[partitionKey].append(row_entity)
-    
-    for partitionKey in sorted_data.keys():
-        upload_batches_to_database(sorted_data[partitionKey], table, connection_string)
-
 def upload_data_to_table_storage(data, table, connection_string):
     """
     Upload a list of dictionaries to Azure TableStorage using single inserts
@@ -57,6 +63,10 @@ def upload_data_to_table_storage(data, table, connection_string):
     :type data: list of dict
     :param table: The name of the table where the data will be inserted
     :type table: str
+    :param connection_string: Connection string to Azure Storage
+    :type connection_string: str
+    :return: Number of uploaded rows
+    :rtype: int
     """
     uploaded = 0
 
@@ -77,6 +87,8 @@ def fetch_from_database(table, connection_string, partition_key=None):
 
     :param table: The name of the table where the data will be inserted
     :type table: str
+    :param connection_string: Connection string to Azure Storage
+    :type connection_string: str
     :param partition_key: Name of PartitionKey to filter on
     :type partition_key: str
     """
@@ -92,6 +104,8 @@ def merge_rows_database(table, connection_string, merge_row):
 
     :param table: The name of the table where the row to merge should exist
     :type table: str
+    :param connection_string: Connection string to Azure Storage
+    :type connection_string: str
     :param merge_row: Dictionary or entity containing PartitionKey and RowKey for
     the row to be updated, and also the new/updated values
     :type merge_row: Dict or entity
@@ -109,8 +123,12 @@ def fetch_existing_RowKeys_from_database(table, connection_string, partition_key
 
     :param table: The name of the table where the data will be inserted
     :type table: str
+    :param connection_string: Connection string to Azure Storage
+    :type connection_string: str
     :param partition_key: Name of PartitionKey to filter on
     :type partition_key: str
+    :return: list of unique RowKeys
+    :rtype: list(str)
     """
     table_service = TableService(connection_string=connection_string)
 
@@ -127,8 +145,8 @@ def map_dataframe_features_to_entity_features(df: pd.DataFrame):
 
     :param file_data: Dataframe containing sounding data
     :type file_data: pandas DataFrame
-    :param table_row: Dataframe containing sounding data, with features accepted by Table Storage
-    :type table_row: pandas DataFrame
+    :return: Dataframe containing sounding data, with features accepted by Table Storage
+    :rtype table_row: pd.DataFrame
     """
 
     date_cols = [c for c in df if df[c].dtype == "datetime64[ns]"]
@@ -148,8 +166,10 @@ def map_dictionary_properties_to_entity_properties(file_data, table_row):
 
     :param file_data: dictionary containing data
     :type file_data: dict
-    :param table_row: dictionary to be uploaded to database
+    :param table_row: dictionary to be uploaded to Table Storage
     :type table_row: dict
+    :return: dictionary ready for upload to Table Storage
+    :rtype: dict
     """
 
     for name, value in file_data.items():

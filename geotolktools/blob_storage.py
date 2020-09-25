@@ -13,17 +13,19 @@ from catboost import CatBoostClassifier
 
 logger = logging.getLogger(__name__)
 
-def download_labeled_dataframe(container, blob, connection_string):
+def download_dataframe(container, blob, connection_string):
     """
-    Downloads strings with serialized pickled dataframes from Azure Blob Storage,
-    deserialize them and return a tuple of dataframes grouped by type of data.
-    The check for processed data uses metadata defined on the blobs. This check
-    is not, as of this time, possible to run server-side.
+    Downloads string with serialized pickled dataframe from Azure Blob Storage,
+    deserialize it and return the dataframe.
 
-    :param include_processed: Include data that has been flagged as processed
-    :type include_processed: bool
+    :param container: Name of container
+    :type data: str
+    :param blob: Name of blob
+    :type data: str
+    :param connection_string: Connection string to Azure Storage
+    :type container_string: str
     :return: Dataframes containing data from total soundings, CPTs, ground samples, and interpretations, respectively.
-    :rtype: tuple of pd.DataFrame
+    :rtype: pd.DataFrame
     """
 
     service_client = BlobServiceClient.from_connection_string(connection_string)
@@ -45,7 +47,11 @@ def download_unprocessed_dataframes(container, connection_string, include_proces
     Downloads strings with serialized dataframes from Azure Blob Storage,
     deserialize them and return a tuple of dataframes grouped by type of data.
     The check for processed data uses metadata defined on the blobs.
-
+    
+    :param container: Name of container where blobs are located
+    :type container: str
+    :param connection_string: Connection string to Azure Storage
+    :type container_string: str
     :param include_processed: Include data that has been flagged as processed
     :type include_processed: bool
     :return: List of dataframes containing data from total soundings, CPTs, ground samples, and interpretations, respectively.
@@ -107,10 +113,15 @@ def upload_dataframe_to_blob_storage(
     :type data: str
     :param container_name: Name of container
     :type data: str
+    :param connection_string: Connection string to Azure Storage
+    :type container_string: str
     :param metadata: Metadata to set on blob
     :type data: dict
-    :param data_format: Determines whether to use pickle to serialize dataframe or to use csv. Accepted inputs are {"csv","pl"}
-    :type source: bool
+    :param data_format: Determines whether to use pickle to serialize dataframe or to use csv. 
+    Accepted inputs are {"csv","pl"}
+    :type source: str
+    :param blob_type: Defines type of blob. Usually either BlockBlob are AppendBlob
+    :type blob_type: azure.storage.blob._models.BlobType
     """
 
     if dataframe is None:
