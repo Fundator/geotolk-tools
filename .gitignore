@@ -127,11 +127,10 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
-Capture.PNG
-cpt_file_cpt_presentation.PNG
-CPT_forklaring.png
-Header + SND.png
+
+# DIV
+*.PNG
+*.png
 setup.py
-sluttkoder.PNG
-stein_blokk_fjell.PNG
-test_parsing.ipynb
+*.ipynb
+notebook/*
