@@ -448,6 +448,10 @@ def parse_snd_file(lines: List[str], min_blocks: int=3) -> dict:
                     elif survey_type == 25:
                         data = _convert_comment_codes_to_indicator_columns(data)
                         data_blocks.append({**metadata, "data": data})
+
+                    else:
+                        msg = f"Unknown survey type {survey_type}"
+                        errors.append(msg)
                 else:
                     errors.append(f"File contains {len(data)} lines, must contain {_MIN_ROWS_TOT} to be able to be parsed")
                     data_blocks.append({**metadata, "data": []})
