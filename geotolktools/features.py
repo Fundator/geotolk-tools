@@ -73,8 +73,8 @@ def _extract_features(df: pd.DataFrame) -> pd.DataFrame:
     for l in window_lengths:
         for col in cont_features:
             df[f"{col}_rolling_median_{l}"] = df[col].rolling(l, center=True, min_periods=1).median()
-            df[f"{col}_rolling_median_absolute_deviation_{l}"] = df[col].rolling(l, center=True, min_periods=1).apply(lambda row: median_absolute_deviation(row))
-            df[f"{col}_rolling_sum_{l}"] = df[col].rolling(l, center=True, min_periods=1).apply(lambda row: sum(row))
+            df[f"{col}_rolling_median_absolute_deviation_{l}"] = df[col].rolling(l, center=True, min_periods=1).apply(lambda row: median_absolute_deviation(row, nan_policy="omit"))
+            df[f"{col}_rolling_sum_{l}"] = df[col].rolling(l, center=True, min_periods=1).sum()
         for col in cat_features:
             df[f"{col}_rolling_sum_{l}"] = df[col].rolling(l, center=True, min_periods=1).sum()
 
