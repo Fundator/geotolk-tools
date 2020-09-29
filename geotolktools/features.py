@@ -7,7 +7,7 @@ from typing import Callable
 _DEPTH_COLNAME = "dybde"
 _PRESSURE_COLNAME = "trykk"
 _FLUSH_COLNAME = "spyle"
-_ID_COLNAME = "borehole_id"
+_ID_COLNAME = "id"
 _FEATURES = [_DEPTH_COLNAME, _PRESSURE_COLNAME, "sek10", "bortid", "smoothed_diff_pressure", "pressure_std", _FLUSH_COLNAME, "spyling", "okt_rotasjon", "slag"]
 
 def _apply_parallel(df_grouped: pd.core.groupby.generic.DataFrameGroupBy, func: Callable) -> pd.DataFrame:
