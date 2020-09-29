@@ -60,7 +60,7 @@ def _create_id(path: str) -> dict:
     filename = split_str[-1]
     oppdragsnr = split_str[-3]
     borehole_id = _sanitize_filename(filename)
-    return {"oppdragsnr": oppdragsnr, "borehole_id": borehole_id, "filename": filename}
+    return {"oppdragsnr": oppdragsnr, "id": borehole_id, "filename": filename}
 
 _FILEPARSER = {
     "snd": parse_snd_file,
@@ -94,7 +94,7 @@ def load_folder(folder_path: str) -> dict:
         # Create ID
         _id = _create_id(abspath)
         # Create unique identifier by joining oppdragsnr and borehole id
-        uid = f"{_id['oppdragsnr']}_{_id['borehole_id']}"
+        uid = f"{_id['oppdragsnr']}_{_id['id']}"
         # Read the lines
         lines = path_to_lines(abspath)
         # Get filetype
@@ -108,7 +108,7 @@ def load_folder(folder_path: str) -> dict:
 
 def _convert_to_df_and_add_id(data: List[dict], _id: str) -> pd.DataFrame:
     df = pd.DataFrame(data)
-    df["borehole_id"] = _id
+    df["id"] = _id
     return df
 
 

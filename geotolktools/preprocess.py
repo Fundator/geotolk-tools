@@ -11,7 +11,7 @@ from .mappings import VALID_RANGES_TOT
 warnings.simplefilter("ignore", RuntimeWarning)
 
 _INDICATOR_COLUMNS = ["okt_rotasjon", "spyling", "slag", "pumping"]
-_ID_COL = "borehole_id"
+_ID_COL = "id"
 _LABEL_COL = "comment_label"
 _CATEGORICAL_COLS = {"okt_rotasjon", "spyling", "slag", "pumping", "comment_label"}
 _FLOAT_COLS = {"trykk", "spyle", "sek10"}

@@ -160,7 +160,7 @@ def map_dataframe_features_to_entity_features(df: pd.DataFrame):
 
     return df
 
-def map_dictionary_properties_to_entity_properties(file_data, table_row):
+def map_dictionary_properties_to_entity_properties(file_data, table_row=None):
     """
     Map dictionary properties to entity properties allowed in Azure TableStorage
 
@@ -171,6 +171,9 @@ def map_dictionary_properties_to_entity_properties(file_data, table_row):
     :return: dictionary ready for upload to Table Storage
     :rtype: dict
     """
+
+    if not table_row:
+        table_row = {}
 
     for name, value in file_data.items():
         if type(value) == np.float64:

@@ -98,6 +98,11 @@ def download_unprocessed_dataframes(container, connection_string, include_proces
 
         logger.info(f"Downloaded blob {blob.name}")
 
+    tot = merge_dfs(tot) if len(tot) > 0 else None
+    cpt = merge_dfs(cpt) if len(cpt) > 0 else None
+    prv = merge_dfs(prv) if len(prv) > 0 else None
+    tlk = merge_dfs(tlk, sort_by=["id", "kote"]) if len(tlk) > 0 else None
+
     return tot, cpt, prv, tlk
 
 def upload_dataframe_to_blob_storage(
@@ -134,7 +139,7 @@ def upload_dataframe_to_blob_storage(
         container_client = blob_service_client.get_container_client(container_name)
 
         if data_format == "csv":
-            serialized_data = dataframe._to_csv()
+            serialized_data = dataframe.to_csv()
         elif data_format == "pl":
             serialized_data = _pickle_dataframe(dataframe)
         else:
@@ -214,7 +219,7 @@ def save_new_CatBoostClassifier_model(model: CatBoostClassifier, container, blob
     service_client = BlobServiceClient.from_connection_string(connection_string)
     container_client = service_client.get_container_client(container)
 
-    _set_exisiting_models_inactive(service_client, container_client)
+    _set_exisiting_models_inactive(service_client, container)
 
     filepath = _save_model_locally(model, model_name)
 
@@ -285,3 +290,22 @@ def get_active_model(container, connection_string):
             return CatBoostClassifier().load_model(blob=data)
     
     return None
+
+def merge_dfs(dfs, reset_index=True, sort_by=["id", "dybde"]):
+    """
+    Combine a list of dataframes into a single dataframe with fixed indices and sorted rows.
+
+    :param dfs: Dataframes to concatenate
+    :type dfs: list of pd.DataFrame
+    :param reset_index: Reset the index of the concatenated DataFrame?
+    :type reset_index: bool
+    :param sort_by: parameter passed to df.sort_values
+    :type sort_by: str | list of str
+    :return: Concatenated dataframe
+    :rtype: pd.DataFrame
+    """
+    df = pd.concat(dfs, sort=False)
+    if reset_index:
+        df.reset_index(drop=True, inplace=True)
+    df.sort_values(by=sort_by, inplace=True)
+    return df
