@@ -151,10 +151,12 @@ def map_dataframe_features_to_entity_features(df: pd.DataFrame):
     """
 
     date_cols = [c for c in df if df[c].dtype == "datetime64[ns]"]
-    df[date_cols] = df[date_cols].apply(lambda r: EntityProperty(EdmType.DATETIME, r), axis=1)
+    if date_cols:
+        df[date_cols] = df[date_cols].apply(lambda r: EntityProperty(EdmType.DATETIME, r), axis=1)
 
     cat_cols = [c for c in df if df[c].dtype == "object"]
-    df[cat_cols] = df[cat_cols].astype(str)
+    if cat_cols:
+        df[cat_cols] = df[cat_cols].astype(str)
     
     # Azure Table Storage cannot accept column names with spaces
     df.rename(columns= lambda c: c.replace(" ", "_"), inplace=True)
