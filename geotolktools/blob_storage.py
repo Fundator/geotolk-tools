@@ -219,7 +219,7 @@ def save_new_CatBoostClassifier_model(model: CatBoostClassifier, container, blob
     service_client = BlobServiceClient.from_connection_string(connection_string)
     container_client = service_client.get_container_client(container)
 
-    _set_exisiting_models_inactive(service_client, container)
+    _set_exisiting_models_inactive(service_client, container_client)
 
     filepath = _save_model_locally(model, model_name)
 
@@ -241,16 +241,16 @@ def _set_model_metadata(container, blob_name):
     blob_client = container.get_blob_client(blob_name)
     blob_client.set_blob_metadata(metadata)
 
-def _set_exisiting_models_inactive(service_client, container):
+def _set_exisiting_models_inactive(service_client, container_client):
     """
     Set all exisiting models to inactive. The property 'Active' defines
     which model will be used in production.
     """
-    blob_list = container.list_blobs(include="metadata")
+    blob_list = container_client.list_blobs(include="metadata")
 
     for blob in blob_list:
         if blob.metadata:
-            blob_client = service_client.get_blob_client(container = container, blob = blob.name)
+            blob_client = container_client.get_blob_client(blob = blob.name)
 
             new_metadata = blob.metadata
             new_metadata["Active"] = "0"
