@@ -70,7 +70,7 @@ def download_unprocessed_dataframes(container, connection_string, include_proces
             continue
 
         try:  
-            blob_client = service_client.get_blob_client(container = container, blob = blob.name)
+            blob_client = container.get_blob_client(blob = blob.name)
             stream = blob_client.download_blob()
             data = stream.readall()
 

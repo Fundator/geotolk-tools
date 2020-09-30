@@ -48,9 +48,10 @@ def _upload_batches_to_database(data, table, connection_string):
 
     batch = TableBatch()
     for row_entity in data:
-        if len(batch._row_keys) == 100:
+        if len(batch._row_keys) == 100 or row_entity["RowKey"] in batch._row_keys:
             table_service.commit_batch(table, batch)
             batch = TableBatch()
+
         batch.insert_or_merge_entity(row_entity)
 
     table_service.commit_batch(table, batch)
