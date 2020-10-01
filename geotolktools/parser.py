@@ -221,7 +221,7 @@ def path_to_lines(path: str) -> List[str]:
     Returns:
         List[str]: List where each element is a line in the file
     """
-    with open(path, "r") as f:
+    with open(path, "r", encoding="latin-1") as f:
         lines = f.readlines()
     lines = [l.replace("\n", "") for l in lines]
     return lines
