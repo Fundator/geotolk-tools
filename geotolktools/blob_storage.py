@@ -66,8 +66,6 @@ def download_unprocessed_dataframes(container, connection_string, include_proces
 
     for blob in blob_list:
         metadata = blob.metadata
-        if not metadata or (not include_processed and metadata.get("Processed") == "1"):
-            continue
 
         try:  
             blob_client = container.get_blob_client(blob = blob.name)
@@ -89,10 +87,6 @@ def download_unprocessed_dataframes(container, connection_string, include_proces
                 tlk.append(dataframe)
             elif metadata.get("Type") == "prv":
                 prv.append(dataframe)
- 
-            metadata["Processed"] = "1"
-            blob_client.set_blob_metadata(metadata)
-
         except Exception:
             logger.error(f"Cannot download blob {blob.name}", exc_info=True)
 
@@ -212,6 +206,12 @@ def save_new_CatBoostClassifier_model(model: CatBoostClassifier, container, blob
 
     :param model: Trained CatboostClassifier
     :type model: CatBoostClassifier
+    :param container: Name of container
+    :type container: str
+    :param blob: Name of blob
+    :type blob: str
+    :param connection_string: connection string to Azure Storage
+    :type connection_string: str
     """
 
     model_name = f"model_{date.today()}.cbm"
@@ -219,7 +219,7 @@ def save_new_CatBoostClassifier_model(model: CatBoostClassifier, container, blob
     service_client = BlobServiceClient.from_connection_string(connection_string)
     container_client = service_client.get_container_client(container)
 
-    _set_exisiting_models_inactive(service_client, container_client)
+    _set_exisiting_models_inactive(container_client)
 
     filepath = _save_model_locally(model, model_name)
 
@@ -228,23 +228,31 @@ def save_new_CatBoostClassifier_model(model: CatBoostClassifier, container, blob
 
     _set_model_metadata(container_client, model_name)
 
-def _set_model_metadata(container, blob_name):
+def _set_model_metadata(container_client, blob_name):
     """
     Set metadata on new model. The property 'Active' defines
     which model will be used in production. The new model will be
     set as the active model.
+
+    :param container_client: Azure Blob Storage Container Client
+    :type container_client: azure.storage.blob.ContainerClient
+    :param blob_name: Name of blob
+    :type blob_name: str
     """
     metadata = {
         "Active": "1"
     }
 
-    blob_client = container.get_blob_client(blob_name)
+    blob_client = container_client.get_blob_client(blob_name)
     blob_client.set_blob_metadata(metadata)
 
-def _set_exisiting_models_inactive(service_client, container_client):
+def _set_exisiting_models_inactive(container_client):
     """
     Set all exisiting models to inactive. The property 'Active' defines
     which model will be used in production.
+
+    :param container_client: Azure Blob Storage Container Client
+    :type container_client: azure.storage.blob.ContainerClient
     """
     blob_list = container_client.list_blobs(include="metadata")
 
@@ -260,6 +268,11 @@ def _set_exisiting_models_inactive(service_client, container_client):
 def _save_model_locally(model, model_name):
     """
     Save model to 'models'-folder
+
+    :param model: Model-object with save_model method
+    :type model: object
+    :param model_name: Name of model
+    :type model_name: str
     """
     model_folder = f"models"
 
@@ -275,6 +288,13 @@ def _save_model_locally(model, model_name):
 def get_active_model(container, connection_string):
     """
     Downloads the active model which is used in production.
+
+    :param container: Name of container
+    :type container: str
+    :param connection_string: connection string to Azure Storage
+    :type connection_string: str
+    :return: Active model
+    :rtype: CatboostClassifier
     """
     service_client = BlobServiceClient.from_connection_string(connection_string)
     container = service_client.get_container_client(container)
@@ -290,6 +310,33 @@ def get_active_model(container, connection_string):
             return CatBoostClassifier().load_model(blob=data)
     
     return None
+
+def data_exists(data_source, blob, connection_string):
+    """
+    Checks metadata on blobs in Azure Blob Storage to check for existence of data from
+    the given datasource.
+
+    :param data_source: Can be either Geovest, Nadag or Norconsult
+    :type data_source: str
+    :param blob: Name of blob
+    :type blob: str
+    :param connection_string: connection string to Azure Storage
+    :type connection_string: str
+    :return: boolean indicating whether data exists or not
+    :rtype: bool
+    """
+
+    service_client = BlobServiceClient.from_connection_string(connection_string)
+    container = service_client.get_container_client(blob)
+
+    blob_list = container.list_blobs(include="metadata")
+
+    for blob in blob_list:
+
+        if blob.metadata and blob.metadata.get("Source") == data_source:
+            return True
+    
+    return False
 
 def merge_dfs(dfs, reset_index=True, sort_by=["id", "dybde"]):
     """
