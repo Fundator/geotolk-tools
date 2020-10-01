@@ -239,7 +239,7 @@ def delete_and_create_table(table_name, connection_string):
         if table_name in table.name:
             delete_table(table.name, connection_string)
     
-    create_table(f"{table_name}{str(date.today()).replace("-","")}", connection_string)
+    create_table(f"{table_name}{str(date.today()).replace('-','')}", connection_string)
 
 def get_table_name(table_name_keyword, connection_string):
     """
