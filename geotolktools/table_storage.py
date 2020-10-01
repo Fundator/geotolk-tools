@@ -188,3 +188,33 @@ def map_dictionary_properties_to_entity_properties(file_data, table_row=None):
         table_row[name] = value
     
     return table_row
+
+def delete_table(table_name, connection_string):
+    """
+    Delete table from Azure Table Storage. Note that deleting a table in Azure
+    only happens during Garbage Collection so there could be up to one minute
+    from calling this function until you can create a table with the same name.
+
+    :param table_name: Name of table to delete
+    :type table_name: str
+    :param connection_string: Connection string to Azure Storage
+    :type connection_string: str
+    """
+
+    table_service = TableService(connection_string=connection_string)
+
+    table_service.delete_table(table_name)
+
+def create_table(table_name, connection_string):
+    """
+    Create new table in Azure Table Storage
+
+    :param table_name: Name of table to create
+    :type table_name: str
+    :param connection_string: Connection string to Azure Storage
+    :type connection_string: str
+    """
+
+    table_service = TableService(connection_string=connection_string)
+
+    table_service.create_table(table_name)
