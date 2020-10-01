@@ -22,7 +22,7 @@ def upload_folder_to_file_storage(fileshare_name: str, account_name: str, accoun
     file_service = FileService(account_name=account_name, account_key=account_key)
     # Check if file service exists, otherwise create it
     if not file_service.exists(fileshare_name):
-        file_service.create_share(fileshare_name)
+        file_service.create_share(fileshare_name, quota=5)
     
     for directoryname in os.listdir(folderpath):
         if not directory_exists(fileshare_name, directoryname):
