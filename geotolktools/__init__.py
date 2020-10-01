@@ -17,3 +17,4 @@ from .table_storage import (
     merge_rows_database, map_dataframe_features_to_entity_features,
     map_dictionary_properties_to_entity_properties
 )
+from .file_storage import upload_folder_to_file_storage
