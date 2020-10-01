@@ -58,7 +58,7 @@ def _sanitize_filename(filename: str) -> str:
 def _create_id(path: str) -> dict:
     split_str = path.split(_SEPARATOR)
     filename = split_str[-1]
-    oppdragsnr = split_str[-3]
+    oppdragsnr = split_str[-2]
     borehole_id = _sanitize_filename(filename)
     return {"oppdragsnr": oppdragsnr, "id": borehole_id, "filename": filename}
 

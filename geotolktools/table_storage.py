@@ -6,6 +6,8 @@ from azure.cosmosdb.table.models import Entity, EntityProperty, EdmType
 from azure.cosmosdb.table.tableservice import TableService
 from azure.cosmosdb.table.tablebatch import TableBatch
 
+from datetime import date
+
 logger = logging.getLogger(__name__)
 
 def batch_upload_data_to_table_storage(data, table, connection_string):
@@ -218,3 +220,43 @@ def create_table(table_name, connection_string):
     table_service = TableService(connection_string=connection_string)
 
     table_service.create_table(table_name)
+
+def delete_and_create_table(table_name, connection_string):
+    """
+    Delete a table containing 'table_name' and create a new one with 'table_name' and todays date
+
+    :param table_name: Name of table to create
+    :type table_name: str
+    :param connection_string: Connection string to Azure Storage
+    :type connection_string: str
+    """
+
+    table_service = TableService(connection_string=connection_string)
+
+    tables = table_service.list_tables()
+
+    for table in tables:
+        if table_name in table.name:
+            delete_table(table.name, connection_string)
+    
+    create_table(f"{table_name}{str(date.today()).replace("-","")}", connection_string)
+
+def get_table_name(table_name_keyword, connection_string):
+    """
+    Get name of table containing 'table_name_keyword' as a keyword
+
+    :param table_name: Table name keyword
+    :type table_name: str
+    :param connection_string: Connection string to Azure Storage
+    :type connection_string: str
+    """
+
+    table_service = TableService(connection_string=connection_string)
+
+    tables = table_service.list_tables()
+
+    for table in tables:
+        if table_name_keyword in table.name:
+            return table.name
+
+    return ""

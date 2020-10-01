@@ -16,7 +16,7 @@ from .table_storage import (
     fetch_existing_RowKeys_from_database, 
     merge_rows_database, map_dataframe_features_to_entity_features,
     map_dictionary_properties_to_entity_properties,
-    create_table,
-    delete_table
+    create_table, delete_table, delete_and_create_table,
+    get_table_name
 )
 from .file_storage import upload_folder_to_file_storage
