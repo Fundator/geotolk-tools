@@ -207,23 +207,25 @@ geosuite_code_to_label = {
 }
 
 #List of features for use in catboost-model
-MODEL_FEATURES = [
+RAW_FEATURES = [    
     'dybde', 
     'trykk', 
     'sek10',
     'spyle',
     'spyling',
     'okt_rotasjon',
-    'slag',
+    'slag']
+
+CALCULATED_FEATURES = [
     'trykk_rolling_median_10',
     'trykk_rolling_median_absolute_deviation_10',
     'trykk_rolling_sum_10', 
     'sek10_rolling_median_10',
     'sek10_rolling_median_absolute_deviation_10', 
     'sek10_rolling_sum_10',
-    'spyletrykk_rolling_median_10',
-    'spyletrykk_rolling_median_absolute_deviation_10',
-    'spyletrykk_rolling_sum_10', 
+    'spyle_rolling_median_10',
+    'spyle_rolling_median_absolute_deviation_10',
+    'spyle_rolling_sum_10', 
     'bortid_rolling_median_10',
     'bortid_rolling_median_absolute_deviation_10', 
     'bortid_rolling_sum_10',
@@ -236,9 +238,9 @@ MODEL_FEATURES = [
     'sek10_rolling_median_50',
     'sek10_rolling_median_absolute_deviation_50', 
     'sek10_rolling_sum_50',
-    'spyletrykk_rolling_median_50',
-    'spyletrykk_rolling_median_absolute_deviation_50',
-    'spyletrykk_rolling_sum_50', 
+    'spyle_rolling_median_50',
+    'spyle_rolling_median_absolute_deviation_50',
+    'spyle_rolling_sum_50', 
     'bortid_rolling_median_50',
     'bortid_rolling_median_absolute_deviation_50',
     'bortid_rolling_sum_50',
@@ -251,13 +253,15 @@ MODEL_FEATURES = [
     'sek10_rolling_median_100',
     'sek10_rolling_median_absolute_deviation_100', 
     'sek10_rolling_sum_100',
-    'spyletrykk_rolling_median_100',
-    'spyletrykk_rolling_median_absolute_deviation_100',
-    'spyletrykk_rolling_sum_100', 
+    'spyle_rolling_median_100',
+    'spyle_rolling_median_absolute_deviation_100',
+    'spyle_rolling_sum_100', 
     'bortid_rolling_median_100',
     'bortid_rolling_median_absolute_deviation_100',
     'bortid_rolling_sum_100', 
     'okt_rotasjon_rolling_sum_100',
     'spyling_rolling_sum_100', 
     'slag_rolling_sum_100', 
-    'trykk_diff']
+    'pressure_diff']
+
+MODEL_FEATURES = RAW_FEATURES + CALCULATED_FEATURES
