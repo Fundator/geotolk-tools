@@ -10,6 +10,8 @@ from datetime import date
 
 logger = logging.getLogger(__name__)
 logging.getLogger("azure.core.pipeline").setLevel(logging.WARNING)
+logging.getLogger("azure.cosmosdb.table.common.storageclient").setLevel(logging.WARNING)
+
 
 def batch_upload_data_to_table_storage(data, table, connection_string):
     """
