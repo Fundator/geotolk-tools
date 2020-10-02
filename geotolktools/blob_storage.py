@@ -12,6 +12,7 @@ from azure.storage.blob._models import BlobType
 from catboost import CatBoostClassifier
 
 logger = logging.getLogger(__name__)
+logging.getLogger("azure.core.pipeline").setLevel(logging.WARNING)
 
 def download_dataframe(container, blob, connection_string):
     """
@@ -70,7 +71,9 @@ def download_unprocessed_dataframes(container, connection_string, include_proces
         try:  
             blob_client = container.get_blob_client(blob = blob.name)
             stream = blob_client.download_blob()
+            logger.info(f"Downloaded blob {blob.name}")
             data = stream.readall()
+            logger.info(f"Read bytestream from blob {blob.name}")
 
             if metadata.get("DataFormat") == "csv":
                 dataframe = _deserialize_csv_blob_data(data)
@@ -78,6 +81,7 @@ def download_unprocessed_dataframes(container, connection_string, include_proces
                 dataframe = _deserialize_pickled_blob_data(data)
             else:
                 raise ValueError("Argument data_format only accepts 'csv' or 'pl'")
+            logger.info(f"Deserialized dataframe from {metadata.get('DataFormat')}-file")
 
             if metadata.get("Type") == "tot":
                 tot.append(dataframe)
@@ -90,8 +94,8 @@ def download_unprocessed_dataframes(container, connection_string, include_proces
         except Exception:
             logger.error(f"Cannot download blob {blob.name}", exc_info=True)
 
-        logger.info(f"Downloaded blob {blob.name}")
-
+    logger.info("Downloaded all unprocessed blobs")
+    
     tot = merge_dfs(tot) if len(tot) > 0 else None
     cpt = merge_dfs(cpt) if len(cpt) > 0 else None
     prv = merge_dfs(prv) if len(prv) > 0 else None
