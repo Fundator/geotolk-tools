@@ -12,6 +12,7 @@ warnings.simplefilter("ignore", RuntimeWarning)
 
 _INDICATOR_COLUMNS = ["okt_rotasjon", "spyling", "slag", "pumping"]
 _ID_COL = "id"
+_PRESSURE_COL = "trykk"
 _LABEL_COL = "comment_label"
 _CATEGORICAL_COLS = {"okt_rotasjon", "spyling", "slag", "pumping", "comment_label"}
 _FLOAT_COLS = {"trykk", "spyle", "sek10"}
@@ -89,6 +90,18 @@ def _correct_values(df: pd.DataFrame, mapping: dict) -> pd.DataFrame:
     return _df
 
 
+def _has_zero_or_negative_mean_pressure(group: pd.DataFrame) -> bool:
+    """Checks if the group's pressure mean is zero or negative
+
+    Args:
+        group (pd.DataFrame): Group of data, aka a borehole
+
+    Returns:
+        bool: True if the mean is zero or negative, False otherwise
+    """
+    return group[_PRESSURE_COL].mean() <= 0
+
+
 def _remove_huge_depth_gaps(df: pd.DataFrame, threshold: float) -> Tuple[pd.DataFrame, List[dict]]:
     _df = df.copy()
     # get difference between rows
@@ -134,6 +147,12 @@ def preprocess(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[dict]]:
         logger.info(f"Starting preprocess for group {name}")
         # Check if it has less than n_rows:
         if not _has_less_than_n_rows(group, _MIN_ROWS_TOT):
+            # Remove samples with negative or zero mean pressure
+            logger.info(f"Checking for samples with zero to negative mean pressure in pressure")
+            if _has_zero_or_negative_mean_pressure(group):
+                errors.append({"filename": name, "error": "Survey has zero or negative mean pressure"})
+                logger.warning(f"File {name} has zero or negative mean pressure, removing it")
+                continue
             # Remove huge gaps
             logger.info(f"Cleaning depth gaps")
             group, error = _remove_huge_depth_gaps(group, _MAX_GAP)

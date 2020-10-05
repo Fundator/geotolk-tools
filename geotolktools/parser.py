@@ -519,7 +519,7 @@ _SYMBOL_LABELS_NEG = [
     'Morene',
     'Torv',
     'Gytje, dy',
-    'Trerester'
+    'Trerester',
     'Kvikkleire'
 ]
 _SYMBOL_LABELS_POS = [

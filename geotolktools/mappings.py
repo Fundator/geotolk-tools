@@ -5,7 +5,7 @@ import numpy as np
 # Waiting to fill these after feedback from geotechnicians
 VALID_RANGES_TOT = {
     "dybde": {"min": 0, "max": np.inf},
-    "trykk": {"min": -np.inf, "max": np.inf},
+    "trykk": {"min": -1000, "max": np.inf},
     "spyle": {"min": 0, "max": np.inf},
     "sek10": {"min": 0, "max": np.inf},
 }
