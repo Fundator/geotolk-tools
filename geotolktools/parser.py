@@ -173,7 +173,7 @@ def _extract_and_add_symbol_text(data: list) -> list:
     for row in temp_data:
         symbol = row["symbol"]
         soiltypes = _label_from_symbol(symbol)
-        row["symbol_soiltype"] = " ".join(soiltypes)
+        row["symbol_soiltype"] = soiltypes
     if not row["symbol_soiltype"]:
         row["symbol_soiltype"] = np.nan
     return temp_data
@@ -321,7 +321,7 @@ def _initialize_empty_mapping(mapping: dict) -> dict:
                 block_parsed[key1] = np.nan
     return block_parsed    
 
-def _label_from_symbol(symbol: int) -> list:
+def _label_from_symbol(symbol: int) -> List[str]:
     """
     Convert Geosuite's 'symbol' column to a list of labels.
 
@@ -375,7 +375,7 @@ def parse_tlk_file(lines: List[str]) -> dict:
     return {"type": "tlk", "data": rows, "errors": errors}
 
 
-def parse_snd_file(lines: List[str], min_blocks: int=3) -> dict:
+def parse_snd_file(lines: List[str], min_blocks: int=2) -> dict:
     """Parses a snd file. These files may contain up to one tot-file and/or up to one cpt-file
 
     Args:
@@ -387,6 +387,7 @@ def parse_snd_file(lines: List[str], min_blocks: int=3) -> dict:
     """
     # Initialize list of errors
     errors = []
+    data_blocks = []
 
     # Create index going through blocks
     block_index = 0
@@ -399,7 +400,7 @@ def parse_snd_file(lines: List[str], min_blocks: int=3) -> dict:
             **_initialize_empty_mapping(third_block_mapping)
             }
 
-    # Check that we at least have 3 blocks. If we dont return the errors
+    # Check that we at least have min_blocks blocks. If we dont return the errors
     if len(blocks) < min_blocks:
         msg = f"File contains less than {min_blocks} blocks. Cannot parse"
         errors.append(msg)
@@ -408,60 +409,79 @@ def parse_snd_file(lines: List[str], min_blocks: int=3) -> dict:
     # We know that the first block is always present for .SND files
     first_block = _parse_metadata_block(blocks[block_index], first_block_mapping)
     block_index += 1
-    # We also know that the second block is always present
+
+    # We also know that the second block is always present, but either as metadata or the data itself
+    second_block = _initialize_empty_mapping(second_block_mapping)
     try:
         second_block = _parse_metadata_block(blocks[block_index], second_block_mapping)
         block_index += 1
     except ValueError:
-        msg = f"File doesnt contain second metadatablock. Cannot parse"
-        errors.append(msg)
-        return {"type": "snd", **metadata, "blocks": [], "errors": errors}
+        if _is_data_block(blocks[block_index]):
+            data_block, err = _parse_snd_block(blocks[block_index])
+            if data_block:
+                data_blocks.append(data_block)
+            if err:
+                errors.extend(err)
+        else:
+            msg = f"File doesnt contain second metadatablock. Cannot parse"
+            errors.append(msg)
+            return {"type": "snd", **metadata, "blocks": [], "errors": errors}
+        block_index += 1
+
+
     # In some old formats, the third metadata block containing guid is missing
     # We check if the third block can be parsed as data. If we can't we assume its a metadata block
+
     third_block = _initialize_empty_mapping(third_block_mapping)
-    if not _is_data_block(blocks[block_index]):
-        third_block = _parse_metadata_block(blocks[block_index], third_block_mapping)
-        block_index += 1
-    # Merge the three first blocks to one dictionary
+
+    if block_index < len(blocks):
+        if not _is_data_block(blocks[block_index]):
+            third_block = _parse_metadata_block(blocks[block_index], third_block_mapping)
+            block_index += 1
+
+        # After this, we dont know what we get, we can get either a tot, a cpt, both or none, so we loop through the remaining blocks to see what we find
+        for current_block_index, block in enumerate(blocks[block_index:]):
+            data_block, err = _parse_snd_block(block)
+            if data_block:
+                data_blocks.append(data_block)
+            if err:
+                errors.extend(err)
+
     snd_metadata = {**first_block, **second_block, **third_block}
-    # After this, we dont know what we get, we can get either a tot, a cpt, both or none, so we loop through the remaining blocks to see what we find
-    data_blocks = []
-    for current_block_index, block in enumerate(blocks[block_index:]):
-        if _is_data_block(block):
-            try:
-                metadata, data = _parse_unknown_data_block(block)
-                survey_type = metadata["survey_type_code"]
-                metadata["type"] = _SURVEY_CODE_TO_TEXT[metadata["survey_type_code"]]
-                if _is_valid_data(data, survey_type):
-                    # If the survey type was CPT, we know that an unknown metadata file is attached at the end. We also suppose that the CPT is the last data block in the SND file, so we can finish up the file
-                    if survey_type == 7:
-                        try:
-                            cpt_unknown_metadata_block = blocks[block_index + current_block_index + 1]
-                            cpt_unknown_metadata = _parse_metadata_block(cpt_unknown_metadata_block, cpt_unknown_block_mapping)
-                        except IndexError:
-                            cpt_unknown_metadata = _initialize_empty_mapping(cpt_unknown_block_mapping)
-                        metadata = {**metadata, **cpt_unknown_metadata}
-                        data_blocks.append({**metadata, "data": data})
-                        break
-
-                    # For tot-files, we need to convert the comment codes to indicator columns
-                    elif survey_type == 25:
-                        data = _convert_comment_codes_to_indicator_columns(data)
-                        data_blocks.append({**metadata, "data": data})
-
-                    else:
-                        msg = f"Unknown survey type {survey_type}"
-                        errors.append(msg)
-                else:
-                    errors.append(f"File contains {len(data)} lines, must contain {_MIN_ROWS_TOT} to be able to be parsed")
-                    data_blocks.append({**metadata, "data": []})
-            except ValueError as e:
-                errors.append(str(e))
-        else:
-            msg = "One or more of the data blocks is not valid"
-            errors.append(msg)
     return {"type": "snd", **snd_metadata, "blocks": data_blocks, "errors": errors
            }
+
+def _parse_snd_block(block: List[str]) -> Tuple[dict, List[str]]:
+    errors = []
+    data_block = {}
+
+    if _is_data_block(block):
+        try:
+            metadata, data = _parse_unknown_data_block(block)
+            survey_type = metadata["survey_type_code"]
+            metadata["type"] = _SURVEY_CODE_TO_TEXT[metadata["survey_type_code"]]
+            if _is_valid_data(data, survey_type):
+
+                if survey_type == 7:
+                    data_block = {**metadata, "data": data}
+
+                # For tot-files, we need to convert the comment codes to indicator columns
+                elif survey_type == 25:
+                    data = _convert_comment_codes_to_indicator_columns(data)
+                    data_block = {**metadata, "data": data}
+                else:
+                    msg = f"Unknown survey type {survey_type}"
+                    errors.append(msg)
+            else:
+                errors.append(f"File contains {len(data)} lines, must contain {_MIN_ROWS_TOT} to be able to be parsed")
+                data_block = {**metadata, "data": []}
+        except ValueError as e:
+            errors.append(str(e))
+    else:
+        msg = "One or more of the data blocks is not valid"
+        errors.append(msg)
+    return data_block, errors
+    
 
 
 def _is_valid_data(data: dict, filetype:str) -> bool:

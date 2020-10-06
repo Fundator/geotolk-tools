@@ -68,7 +68,7 @@ tot_data_mapping = {
     "trykk": {"index": 1, "dtype": int},
     "spyle": {"index": 2, "dtype": int},
     "sek10": {"index": 3, "dtype": int},
-    "kommentar": {"index": slice(4, None), "dtype": lambda x: " ".join(list(x)) if (len(list(x)) > 0) else np.nan}
+    "kommentar": {"index": slice(4, None), "dtype": lambda x: list(x) if (len(list(x)) > 0) else np.nan}
 }
 
 cpt_data_mapping = {
