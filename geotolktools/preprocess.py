@@ -1,4 +1,4 @@
-import logging
+import multiprocessing
 import pandas as pd
 import numpy as np
 from scipy.stats import trim_mean, median_absolute_deviation
@@ -17,8 +17,6 @@ _CATEGORICAL_COLS = {"okt_rotasjon", "spyling", "slag", "pumping", "comment_labe
 _FLOAT_COLS = {"trykk", "spyle", "sek10"}
 _MIN_ROWS_TOT = 5
 _MAX_GAP = 2.5
-
-logger = logging.getLogger(__name__)
 
 def _standardize_depth(df: pd.DataFrame, float_cols: set=_FLOAT_COLS, categorical_cols: set=_CATEGORICAL_COLS,  depth_delta: float=0.04, depth_colname: str="dybde", comment_colname: str="kommentar") -> pd.DataFrame:
     # Sjekk om dybden allerede er korrekt
@@ -125,39 +123,30 @@ def preprocess(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[dict]]:
     Returns:
         Tuple[pd.DataFrame, List[dict]]: (<processed_dataframe>, List of errors occured during preprocessing)
     """
-    logger.info("Starting preprocessing inside geotolktools")
     _df = df.copy()
     errors = []
     groups = []
     # Group by id-column
     for name, group in _df.groupby(_ID_COL):
-        logger.info(f"Starting preprocess for group {name}")
         # Check if it has less than n_rows:
         if not _has_less_than_n_rows(group, _MIN_ROWS_TOT):
             # Remove huge gaps
-            logger.info(f"Cleaning depth gaps")
             group, error = _remove_huge_depth_gaps(group, _MAX_GAP)
             if error:
                 errors.append({"filename": name, "error": error})
             # Fill indicator_columns
-            logger.info(f"Filling indicator columns")
             group[_INDICATOR_COLUMNS] = _fill_indicator_cols(group, _INDICATOR_COLUMNS)
             # Fill label column
-            logger.info(f"Filling label column")
             group[_LABEL_COL] = _fill_label_col(group, _LABEL_COL)
             # Clip values
-            logger.info("Clipping values")
             group = _correct_values(group, VALID_RANGES_TOT)
-
             # Standardize depth
             try:
-                logging.info("Standardizing depth")
                 groups.append(_standardize_depth(group))
             except ValueError as e:
                 errors.append({"filename": name, "error": e})
         else:
             errors.append({"filename": name, "error": f"Skipped as it has less than {_MIN_ROWS_TOT} rows"})
-    logging.info("Concating and resetting index")
     out = pd.concat(groups)
     out.reset_index(inplace=True, drop=True)
     return out, errors

@@ -144,7 +144,8 @@ def upload_dataframe_to_blob_storage(
             raise ValueError("Argument data_format only accepts 'csv' or 'pl'")
         
         blob_client = container_client.get_blob_client(blob_name)
-        blob_client.upload_blob(data=serialized_data, blob_type = blob_type, overwrite=True)        
+        overwrite = blob_type == BlobType.BlockBlob 
+        blob_client.upload_blob(data=serialized_data, blob_type = blob_type, overwrite=overwrite)        
 
         if metadata:
             blob_client = container_client.get_blob_client(blob_name)
