@@ -144,10 +144,8 @@ def preprocess(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[dict]]:
         # Check if it has less than n_rows:
         if not _has_less_than_n_rows(group, _MIN_ROWS_TOT):
             # Remove samples with negative or zero mean pressure
-            logger.info(f"Checking for samples with zero to negative mean pressure in pressure")
             if _has_zero_or_negative_mean_pressure(group):
                 errors.append({"filename": name, "error": "Survey has zero or negative mean pressure"})
-                logger.warning(f"File {name} has zero or negative mean pressure, removing it")
                 continue
             # Remove huge gaps
             group, error = _remove_huge_depth_gaps(group, _MAX_GAP)
