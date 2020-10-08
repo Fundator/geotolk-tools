@@ -292,9 +292,9 @@ def _convert_comment_codes_to_indicator_columns(parsed_snd_block: list) -> dict:
         
         # If we have a comment
         comments = row["kommentar"]
-        if isinstance(comments, str):
+        if isinstance(comments, list):
             # for each comment in comments
-            for code in comments.split():
+            for code in comments:
                 # Convert textcodes to codes for convenience when going ahead
                 if code in geosuite_textcode_to_code.keys():
                     code = geosuite_textcode_to_code[code]
