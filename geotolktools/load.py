@@ -5,6 +5,7 @@ import re
 from typing import List, Tuple
 from .parser import parse_snd_file, parse_tlk_file, parse_prv_file, path_to_lines
 import pandas as pd
+from uuid import uuid4
 
 _VALID_FILETYPES = [".snd", ".tlk", ".prv"]
 _PR_PATTERN = re.compile(".*PR([^\-]).*(SND|snd)")
@@ -58,7 +59,11 @@ def _sanitize_filename(filename: str) -> str:
 def _create_id(path: str) -> dict:
     split_str = path.split(_SEPARATOR)
     filename = split_str[-1]
-    oppdragsnr = split_str[-2]
+    try:
+        oppdragsnr = split_str[-2]
+    except IndexError:
+        oppdragsnr = str(uuid4())
+
     borehole_id = _sanitize_filename(filename)
     return {"oppdragsnr": oppdragsnr, "id": borehole_id, "filename": filename}
 
