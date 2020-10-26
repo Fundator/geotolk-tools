@@ -35,13 +35,16 @@ def download_dataframe(container, blob, connection_string):
     try:  
         stream = blob_client.download_blob()
         data = stream.readall()
+        logger.info(f"Downloaded blob {blob}")
+
         dataframe = _deserialize_csv_blob_data(data)
-    except Exception:
+        logger.info(f"Deserialized blob {blob}")
+        if dataframe:
+            return dataframe
+    except Exception as e:
         logger.error(f"Cannot download blob {blob}", exc_info=True)
+        raise e
 
-    logger.info(f"Downloaded blob {blob}")
-
-    return dataframe
 
 def download_unprocessed_dataframes(container, connection_string, include_processed = False):
     """
@@ -199,9 +202,7 @@ def _deserialize_csv_blob_data(csv_bytestring):
     :rtype: tuple of pd.DataFrame
     """
 
-    buffer = StringIO(csv_bytestring.decode('utf-8'))
-
-    dataframe = pd.read_csv(buffer)
+    dataframe = pd.read_csv(StringIO(csv_bytestring.decode('utf-8')))
 
     return dataframe
 
