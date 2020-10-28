@@ -34,13 +34,16 @@ def download_dataframe(container, blob, connection_string):
 
     try:  
         stream = blob_client.download_blob()
-        data = stream.readall()
+        filename = "labeled_from_azure.csv"
+        with open(filename, "w") as f:
+            stream.readinto(f)
         logger.info(f"Downloaded blob {blob}")
 
-        dataframe = _deserialize_csv_blob_data(data)
-        logger.info(f"Deserialized blob {blob}")
-        if dataframe:
-            return dataframe
+        #dataframe = _deserialize_csv_blob_data(data)
+        #logger.info(f"Deserialized blob {blob}")
+        dataframe = pd.read_csv(filename)
+        logger.info("Loaded downloaded data as dataframe")
+        return dataframe
     except Exception as e:
         logger.error(f"Cannot download blob {blob}", exc_info=True)
         raise e
