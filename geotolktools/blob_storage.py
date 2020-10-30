@@ -210,7 +210,7 @@ def _deserialize_csv_blob_data(csv_bytestring):
 
     return dataframe
 
-def save_new_CatBoostClassifier_model(model: CatBoostClassifier, container, blob, connection_string):
+def save_new_CatBoostClassifier_model(model: CatBoostClassifier, container, blob, connection_string, model_metadata: dict=None):
     """
     Save new CatboostClassifier to Blob Storage and set this model to
     be the active model.
@@ -237,9 +237,9 @@ def save_new_CatBoostClassifier_model(model: CatBoostClassifier, container, blob
     with open(filepath, "rb") as file:
         container_client.upload_blob(name=model_name, data=file.read())
 
-    _set_model_metadata(container_client, model_name)
+    _set_model_metadata(container_client, model_name, model_metadata)
 
-def _set_model_metadata(container_client, blob_name):
+def _set_model_metadata(container_client, blob_name, model_metadata: dict = None):
     """
     Set metadata on new model. The property 'Active' defines
     which model will be used in production. The new model will be
@@ -253,6 +253,8 @@ def _set_model_metadata(container_client, blob_name):
     metadata = {
         "Active": "1"
     }
+    if model_metadata is not None:
+        metadata.update(model_metadata)
 
     blob_client = container_client.get_blob_client(blob_name)
     blob_client.set_blob_metadata(metadata)
