@@ -320,7 +320,7 @@ def get_active_model(container, connection_string):
             stream = blob_client.download_blob()
             data = stream.readall()
 
-            return CatBoostClassifier().load_model(blob=data)
+            return CatBoostClassifier().load_model(blob=data), blob.name
     
     return None
 
