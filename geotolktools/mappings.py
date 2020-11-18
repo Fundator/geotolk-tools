@@ -265,3 +265,12 @@ CALCULATED_FEATURES = [
     'pressure_diff']
 
 MODEL_FEATURES = RAW_FEATURES + CALCULATED_FEATURES
+
+CLASS_TO_NAME_GROV = {
+    0: "Udrenert",
+    1: "Drenert",
+    2: "Harde masser",
+    3: "Berg",
+}
+
+NAME_TO_CLASS_GROV = {v:k for k, v in CLASS_TO_NAME_GROV.items()}
